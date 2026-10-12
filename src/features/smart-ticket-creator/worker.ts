@@ -12,9 +12,11 @@
  *   generate -> run one generation; streams tokens, then the validated ticket
  *   interrupt-> stop the current generation early
  *
- * Model: onnx-community/Qwen2.5-1.5B-Instruct — a text-generation model chosen
+ * Model: onnx-community/Qwen2.5-0.5B-Instruct — a text-generation model chosen
  * for its documented instruction-following and JSON output quality. It is run
- * via WebGPU (q4f16) when available, falling back to the WASM/CPU backend (q4).
+ * with `q4` weights on both the WebGPU and the WASM/CPU backend (`q4f16` is
+ * intentionally avoided — it overflows to NaN on the ONNX Runtime WebGPU
+ * backend; see the MODEL_ID / dtype notes below).
  *
  * Structured output: Transformers.js has no constrained/grammar decoding, so we
  * prompt for JSON, parse + validate it with Zod, and retry once locally if the

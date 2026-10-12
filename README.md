@@ -294,7 +294,7 @@ download in ~483 MB, but it is unusable here — see _Known limitations_.)
 
 ### Expected performance
 
-- First run is slow: the ~1.2 GB download plus WebGPU shader compilation (there
+- First run is slow: the ~786 MB download plus WebGPU shader compilation (there
   is a one-token warm-up pass to pay that cost up front). Subsequent generations
   reuse the loaded model and are much faster.
 - On a typical discrete GPU, generation streams at tens of tokens per second
@@ -927,7 +927,7 @@ src/
     ui/          # Reusable primitives: Card, Badge, FeaturePanel, Placeholder
   features/
     ai-accessibility/          # ✅ implemented (Florence-2, image captioning)
-    smart-ticket-creator/      # ✅ implemented (Qwen2.5-1.5B-Instruct, structured extraction)
+    smart-ticket-creator/      # ✅ implemented (Qwen2.5-0.5B-Instruct, structured extraction)
     pause-and-ask/             # ✅ implemented (LFM2.5-VL-450M, live camera VQA)
     semantic-search/           # ✅ implemented (all-MiniLM-L6-v2, embeddings + cosine search)
     background-remover/        # ✅ implemented (RMBG-1.4, foreground segmentation -> transparent PNG)
@@ -952,7 +952,7 @@ Each feature is an independent, bookmarkable route served under a shared layout:
 | `/semantic-search` | Semantic Search |
 | `/background-remover` | AI Background Remover |
 
-- `/` redirects to `/ai-accessibility`.
+- `/` redirects to `/background-remover`.
 - Unknown routes render a simple **Page not found** fallback.
 - Every feature page is lazy-loaded with `React.lazy()` and streamed in under a
   `Suspense` fallback, so no feature code (or future on-demand AI model) is
