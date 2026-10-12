@@ -8,7 +8,7 @@ import { ModelStatus } from './components/ModelStatus'
 import { AltTextResult } from './components/AltTextResult'
 import { useAltText, prepareImage, releaseImage } from './useAltText'
 import { cleanCaption, applyContext } from './altText'
-import type { CaptionDetail } from './types'
+import { MODEL_ID, type CaptionDetail } from './types'
 
 /** Detail levels shown as a segmented control, mapped to Florence-2 tasks. */
 const DETAIL_OPTIONS: { value: CaptionDetail; label: string; hint: string }[] = [
@@ -111,145 +111,168 @@ export function AiAccessibility() {
           <Badge>100% on-device</Badge>
         </div>
 
-        {/* Upload / preview */}
+        {/* Before an image is picked, the dropzone takes the full width. Once an
+            image exists we switch to a two-column layout on large screens:
+            the preview on the left, all controls + output on the right, so on
+            desktop the text sits beside the image instead of wrapping below. */}
         {!imageUrl ? (
-          <Dropzone onFile={handleFile} disabled={busy} />
+          <>
+            <Dropzone onFile={handleFile} disabled={busy} />
+            {imageError && (
+              <p className="rounded-md border border-rose-400/30 bg-rose-500/10 px-3 py-2 text-sm text-rose-200">
+                {imageError}
+              </p>
+            )}
+          </>
         ) : (
-          <div className="space-y-3">
-            <div className="relative overflow-hidden rounded-lg border border-white/10 bg-black/30">
-              <img
-                src={imageUrl}
-                alt="Uploaded image to describe"
-                className="mx-auto max-h-80 w-auto object-contain"
-              />
-              {!busy && (
-                <button
-                  type="button"
-                  onClick={handleReset}
-                  className="absolute right-2 top-2 inline-flex items-center gap-1 rounded-md border border-white/15 bg-black/60 px-2 py-1 text-xs text-gray-200 backdrop-blur transition-colors hover:bg-black/80"
-                >
-                  <X className="size-3.5" aria-hidden="true" />
-                  Remove
-                </button>
+          <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,22rem)_minmax(0,1fr)] xl:grid-cols-[minmax(0,26rem)_minmax(0,1fr)]">
+            {/* Left column: image preview (sticky on desktop so it stays in
+                view while the right column grows with the result). */}
+            <div className="space-y-3 lg:sticky lg:top-6">
+              <div className="relative overflow-hidden rounded-lg border border-white/10 bg-black/30">
+                <img
+                  src={imageUrl}
+                  alt="Uploaded image to describe"
+                  className="mx-auto max-h-80 w-auto object-contain lg:max-h-[28rem]"
+                />
+                {!busy && (
+                  <button
+                    type="button"
+                    onClick={handleReset}
+                    className="absolute right-2 top-2 inline-flex items-center gap-1 rounded-md border border-white/15 bg-black/60 px-2 py-1 text-xs text-gray-200 backdrop-blur transition-colors hover:bg-black/80"
+                  >
+                    <X className="size-3.5" aria-hidden="true" />
+                    Remove
+                  </button>
+                )}
+              </div>
+
+              {imageError && (
+                <p className="rounded-md border border-rose-400/30 bg-rose-500/10 px-3 py-2 text-sm text-rose-200">
+                  {imageError}
+                </p>
               )}
             </div>
-          </div>
-        )}
 
-        {imageError && (
-          <p className="rounded-md border border-rose-400/30 bg-rose-500/10 px-3 py-2 text-sm text-rose-200">
-            {imageError}
-          </p>
-        )}
+            {/* Right column: controls, status and the editable result. */}
+            <div className="space-y-6">
+              {/* Detail level */}
+              <div className="space-y-1.5">
+                <span className="block text-sm font-medium text-gray-300">Description detail</span>
+                <div className="flex flex-wrap gap-2">
+                  {DETAIL_OPTIONS.map((opt) => (
+                    <button
+                      key={opt.value}
+                      type="button"
+                      onClick={() => setDetail(opt.value)}
+                      disabled={busy}
+                      aria-pressed={detail === opt.value}
+                      title={opt.hint}
+                      className={cn(
+                        'rounded-full border px-3 py-1 text-xs font-medium transition-colors disabled:opacity-50',
+                        detail === opt.value
+                          ? 'border-indigo-400/60 bg-indigo-500/15 text-indigo-200'
+                          : 'border-white/10 bg-transparent text-gray-400 hover:text-gray-200',
+                      )}
+                    >
+                      {opt.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
 
-        {/* Detail level */}
-        <div className="space-y-1.5">
-          <span className="block text-sm font-medium text-gray-300">Description detail</span>
-          <div className="flex flex-wrap gap-2">
-            {DETAIL_OPTIONS.map((opt) => (
-              <button
-                key={opt.value}
-                type="button"
-                onClick={() => setDetail(opt.value)}
-                disabled={busy}
-                aria-pressed={detail === opt.value}
-                title={opt.hint}
-                className={cn(
-                  'rounded-full border px-3 py-1 text-xs font-medium transition-colors disabled:opacity-50',
-                  detail === opt.value
-                    ? 'border-indigo-400/60 bg-indigo-500/15 text-indigo-200'
-                    : 'border-white/10 bg-transparent text-gray-400 hover:text-gray-200',
+              {/* Optional context */}
+              <div className="space-y-1.5">
+                <label htmlFor="alt-context" className="block text-sm font-medium text-gray-300">
+                  Image context <span className="text-gray-500">(optional)</span>
+                </label>
+                <input
+                  id="alt-context"
+                  type="text"
+                  value={context}
+                  onChange={(e) => setContext(e.target.value)}
+                  disabled={busy}
+                  placeholder='e.g. "Hero image on the pricing page"'
+                  className="w-full rounded-md border border-white/10 bg-white/[0.03] px-3 py-2 text-sm text-gray-100 placeholder:text-gray-600 focus:border-indigo-400/60 focus:outline-none focus:ring-1 focus:ring-indigo-400/60 disabled:opacity-60"
+                />
+                <p className="text-xs text-gray-500">
+                  The model describes only what it sees in the pixels. Context you add here is
+                  folded into the suggestion afterwards (as a purpose hint) — it does not change
+                  what the model detects. Edit the result to phrase it for its real purpose.
+                </p>
+              </div>
+
+              {/* Actions */}
+              <div className="flex flex-wrap items-center gap-3">
+                <button
+                  type="button"
+                  onClick={handleGenerate}
+                  disabled={!imageUrl || busy}
+                  className={cn(
+                    'inline-flex items-center gap-2 rounded-md px-4 py-2 text-sm font-semibold transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400',
+                    'bg-indigo-500 text-white hover:bg-indigo-400',
+                    'disabled:cursor-not-allowed disabled:bg-white/10 disabled:text-gray-500',
+                  )}
+                >
+                  {busy ? (
+                    <Loader2 className="size-4 animate-spin" aria-hidden="true" />
+                  ) : (
+                    <Sparkles className="size-4" aria-hidden="true" />
+                  )}
+                  {buttonLabel}
+                </button>
+
+                {(imageUrl || altText) && !busy && (
+                  <button
+                    type="button"
+                    onClick={handleReset}
+                    className="inline-flex items-center gap-2 rounded-md border border-white/15 bg-white/5 px-3 py-2 text-sm text-gray-200 transition-colors hover:bg-white/10"
+                  >
+                    <RotateCcw className="size-4" aria-hidden="true" />
+                    Reset
+                  </button>
                 )}
-              >
-                {opt.label}
-              </button>
-            ))}
-          </div>
-        </div>
+              </div>
 
-        {/* Optional context */}
-        <div className="space-y-1.5">
-          <label htmlFor="alt-context" className="block text-sm font-medium text-gray-300">
-            Image context <span className="text-gray-500">(optional)</span>
-          </label>
-          <input
-            id="alt-context"
-            type="text"
-            value={context}
-            onChange={(e) => setContext(e.target.value)}
-            disabled={busy}
-            placeholder='e.g. "Hero image on the pricing page"'
-            className="w-full rounded-md border border-white/10 bg-white/[0.03] px-3 py-2 text-sm text-gray-100 placeholder:text-gray-600 focus:border-indigo-400/60 focus:outline-none focus:ring-1 focus:ring-indigo-400/60 disabled:opacity-60"
-          />
-          <p className="text-xs text-gray-500">
-            The model describes only what it sees in the pixels. Context you add here is
-            folded into the suggestion afterwards (as a purpose hint) — it does not change
-            what the model detects. Edit the result to phrase it for its real purpose.
-          </p>
-        </div>
+              {/* Model status / download progress */}
+              {(busy || support.checked) && (
+                <ModelStatus
+                  status={status}
+                  support={support}
+                  device={device}
+                  progress={progress}
+                  modelId={MODEL_ID}
+                />
+              )}
 
-        {/* Actions */}
-        <div className="flex flex-wrap items-center gap-3">
-          <button
-            type="button"
-            onClick={handleGenerate}
-            disabled={!imageUrl || busy}
-            className={cn(
-              'inline-flex items-center gap-2 rounded-md px-4 py-2 text-sm font-semibold transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400',
-              'bg-indigo-500 text-white hover:bg-indigo-400',
-              'disabled:cursor-not-allowed disabled:bg-white/10 disabled:text-gray-500',
-            )}
-          >
-            {busy ? (
-              <Loader2 className="size-4 animate-spin" aria-hidden="true" />
-            ) : (
-              <Sparkles className="size-4" aria-hidden="true" />
-            )}
-            {buttonLabel}
-          </button>
+              {/* Inference error */}
+              {status === 'error' && error && (
+                <div className="space-y-1.5 rounded-md border border-rose-400/30 bg-rose-500/10 px-3 py-3 text-sm text-rose-200">
+                  <p className="font-medium">Generation failed</p>
+                  <p className="text-rose-300/90">{error}</p>
+                  <p className="text-xs text-rose-300/70">
+                    This can happen if the browser lacks WebGPU and has insufficient memory for
+                    the CPU fallback. Try a Chromium-based desktop browser with WebGPU enabled.
+                  </p>
+                </div>
+              )}
 
-          {(imageUrl || altText) && !busy && (
-            <button
-              type="button"
-              onClick={handleReset}
-              className="inline-flex items-center gap-2 rounded-md border border-white/15 bg-white/5 px-3 py-2 text-sm text-gray-200 transition-colors hover:bg-white/10"
-            >
-              <RotateCcw className="size-4" aria-hidden="true" />
-              Reset
-            </button>
-          )}
-        </div>
+              {/* Editable result */}
+              {hasResult && (
+                <div className="space-y-4 border-t border-white/10 pt-6">
+                  <AltTextResult value={altText} onChange={setAltText} />
 
-        {/* Model status / download progress */}
-        {(busy || support.checked) && (
-          <ModelStatus status={status} support={support} device={device} progress={progress} />
-        )}
-
-        {/* Inference error */}
-        {status === 'error' && error && (
-          <div className="space-y-1.5 rounded-md border border-rose-400/30 bg-rose-500/10 px-3 py-3 text-sm text-rose-200">
-            <p className="font-medium">Generation failed</p>
-            <p className="text-rose-300/90">{error}</p>
-            <p className="text-xs text-rose-300/70">
-              This can happen if the browser lacks WebGPU and has insufficient memory for
-              the CPU fallback. Try a Chromium-based desktop browser with WebGPU enabled.
-            </p>
-          </div>
-        )}
-
-        {/* Editable result */}
-        {hasResult && (
-          <div className="space-y-4 border-t border-white/10 pt-6">
-            <AltTextResult value={altText} onChange={setAltText} />
-
-            <div className="flex items-start gap-2 rounded-md border border-sky-400/20 bg-sky-500/5 px-3 py-2.5 text-xs text-sky-200/90">
-              <Info className="mt-0.5 size-4 shrink-0 text-sky-300" aria-hidden="true" />
-              <p>
-                AI-generated alt text is a starting point, not a finished answer. A model
-                describes pixels; it does not know an image&apos;s purpose on your page, and it
-                can miss, misread, or invent details. Always review and edit before publishing —
-                good alt text depends on <em>why</em> the image is used, which only you know.
-              </p>
+                  <div className="flex items-start gap-2 rounded-md border border-sky-400/20 bg-sky-500/5 px-3 py-2.5 text-xs text-sky-200/90">
+                    <Info className="mt-0.5 size-4 shrink-0 text-sky-300" aria-hidden="true" />
+                    <p>
+                      AI-generated alt text is a starting point, not a finished answer. A model
+                      describes pixels; it does not know an image&apos;s purpose on your page, and it
+                      can miss, misread, or invent details. Always review and edit before publishing —
+                      good alt text depends on <em>why</em> the image is used, which only you know.
+                    </p>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         )}

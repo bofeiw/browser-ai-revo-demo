@@ -19,6 +19,12 @@
  * See the Florence-2 model card:
  * https://huggingface.co/onnx-community/Florence-2-base-ft
  */
+/**
+ * Hugging Face model id used for alt-text generation. Single source of truth,
+ * imported by both the worker (to load it) and the UI (to display it).
+ */
+export const MODEL_ID = 'onnx-community/Florence-2-base-ft'
+
 export type CaptionDetail = 'concise' | 'detailed' | 'rich'
 
 /** Maps a UI detail level to the exact Florence-2 task token. */

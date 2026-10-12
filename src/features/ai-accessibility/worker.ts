@@ -36,9 +36,7 @@ import type {
   WorkerRequest,
   WorkerResponse,
 } from './types'
-import { CAPTION_TASKS } from './types'
-
-const MODEL_ID = 'onnx-community/Florence-2-base-ft'
+import { CAPTION_TASKS, MODEL_ID } from './types'
 
 /**
  * The Transformers.js model/processor/tokenizer objects are dynamically shaped

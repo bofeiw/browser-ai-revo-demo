@@ -7,6 +7,8 @@ interface ModelStatusProps {
   support: WebGpuSupport
   device: InferenceDevice | null
   progress: ModelFileProgress[]
+  /** Hugging Face model id, shown so users know exactly what's running. */
+  modelId: string
 }
 
 function formatBytes(bytes?: number): string {
@@ -20,12 +22,24 @@ function formatBytes(bytes?: number): string {
  * downloading, a per-file progress breakdown. This makes the one-time model
  * download visible instead of looking like a hang.
  */
-export function ModelStatus({ status, support, device, progress }: ModelStatusProps) {
+export function ModelStatus({ status, support, device, progress, modelId }: ModelStatusProps) {
   const activeFiles = progress.filter((p) => (p.progress ?? 0) < 100)
   const loading = status === 'loading-model'
 
   return (
     <div className="space-y-3 rounded-lg border border-white/10 bg-white/[0.02] p-4">
+      <p className="text-xs text-gray-400">
+        Model:{' '}
+        <a
+          href={`https://huggingface.co/${modelId}`}
+          target="_blank"
+          rel="noreferrer"
+          className="font-mono text-gray-200 underline decoration-white/20 underline-offset-2 transition-colors hover:text-indigo-300 hover:decoration-indigo-300/60"
+        >
+          {modelId}
+        </a>
+      </p>
+
       <div className="flex flex-wrap items-center gap-2 text-xs">
         {device === 'webgpu' || (support.checked && support.webgpu && !device) ? (
           <span className="inline-flex items-center gap-1 rounded-full border border-emerald-400/30 bg-emerald-500/10 px-2.5 py-0.5 font-medium text-emerald-300">
