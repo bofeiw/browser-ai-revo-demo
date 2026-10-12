@@ -11,6 +11,21 @@
     />
   </head>
   <body>
+    <!--
+      GitHub Pages SPA redirect: 404.html encodes the requested deep-link into
+      the query string and sends the visitor here. This snippet decodes it back
+      into a clean URL before React Router boots, so refreshing or sharing a
+      sub-route works. See public/404.html.
+    -->
+    <script>
+      (function () {
+        var redirect = sessionStorage.redirect
+        delete sessionStorage.redirect
+        if (redirect && redirect !== location.href) {
+          history.replaceState(null, '', redirect)
+        }
+      })()
+    </script>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>

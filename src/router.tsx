@@ -15,7 +15,8 @@ const BackgroundRemover = lazy(
   () => import('./features/background-remover/BackgroundRemover'),
 )
 
-export const router = createBrowserRouter([
+export const router = createBrowserRouter(
+  [
   {
     path: '/',
     element: <RootLayout />,
@@ -31,4 +32,10 @@ export const router = createBrowserRouter([
       { path: '*', element: <NotFound /> },
     ],
   },
-])
+  ],
+  {
+    // Vite injects BASE_URL ("/" in dev, "/practical-browser-ai/" on GitHub
+    // Pages). react-router expects it without the trailing slash.
+    basename: import.meta.env.BASE_URL.replace(/\/$/, '') || '/',
+  },
+)
