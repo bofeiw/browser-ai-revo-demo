@@ -17,18 +17,19 @@ client using browser-compatible models through technologies such as
 | --- | --- |
 | **Screenshot Bug Reporter** ✅ | Upload a screenshot and generate a structured bug report with a local vision-language model. |
 | **AI Accessibility** ✅ | Upload an image and generate suggested alt text with a local image-captioning model. |
-| **Smart Ticket Creator** | Convert unstructured natural language into a structured issue ticket. |
+| **Smart Ticket Creator** ✅ | Convert an unstructured natural-language complaint into a structured issue ticket with a local language model. |
 | **Pause & Ask** | Analyze a live camera feed, pause on a frame, and ask questions about its content. |
 | **Semantic Search** | Search through local documents using semantic similarity. |
 
-> **Status:** The **Screenshot Bug Reporter** and **AI Accessibility** tabs are
-> fully implemented and run real in-browser inference. The remaining three tabs
-> are still clearly labeled placeholders and will be implemented in later
-> iterations.
+> **Status:** The **Screenshot Bug Reporter**, **AI Accessibility**, and
+> **Smart Ticket Creator** tabs are fully implemented and run real in-browser
+> inference. The remaining two tabs are still clearly labeled placeholders and
+> will be implemented in later iterations.
 
-See [Screenshot Bug Reporter](#screenshot-bug-reporter-1) and
-[AI Accessibility](#ai-accessibility--local-alt-text-generator) below for each
-feature's model, runtime, requirements, and known limitations.
+See [Screenshot Bug Reporter](#screenshot-bug-reporter-1),
+[AI Accessibility](#ai-accessibility--local-alt-text-generator), and
+[Smart Ticket Creator](#smart-ticket-creator-1) below for each feature's model,
+runtime, requirements, and known limitations.
 
 ## Tech stack
 
@@ -38,6 +39,7 @@ feature's model, runtime, requirements, and known limitations.
 - [Tailwind CSS v4](https://tailwindcss.com/) for styling
 - [Lucide React](https://lucide.dev/) for icons
 - [Transformers.js v4](https://huggingface.co/docs/transformers.js) (`@huggingface/transformers`) for in-browser, WebGPU-accelerated model inference
+- [Zod](https://zod.dev/) for validating model-generated structured output (Smart Ticket Creator)
 
 ## Getting started
 
@@ -300,6 +302,191 @@ regenerating doesn't re-encode the same pixels. It is a separate worker and mode
 from the Screenshot Bug Reporter — each feature downloads its own model only when
 its route is visited, so an unrelated tab never pulls weights it doesn't need.
 
+## Smart Ticket Creator
+
+Paste a rough, informal complaint — the kind a user actually writes — and a
+local language model rewrites it into a clean, structured issue ticket: a
+concise title, a professional description, a suggested type and priority,
+expected vs. actual behavior, steps to reproduce, and the information still
+missing to investigate. Every field is editable, and the ticket can be copied as
+Markdown (**Copy Ticket**) or as raw JSON (**Copy JSON**). Two example complaints
+(one messy, one deliberately vague) are one click away for quick testing.
+
+For example, this complaint:
+
+> So I clicked save like five times and nothing happened, then the page froze
+> and I had to refresh, and now I'm not even sure if my changes were saved. This
+> happened twice today and it's really annoying.
+
+becomes a ticket with a title like _"Save button unresponsive; page freezes
+after repeated clicks"_, the fact _"clicked Save five times"_ and _"happened
+twice today"_ preserved in steps/description, priority left at **Medium** or
+**Unknown** (the word "annoying" is not treated as evidence of High impact), and
+questions such as _"Which browser and OS?"_ listed under missing information
+rather than invented.
+
+**Nothing leaves the device.** The model is downloaded from the Hugging Face Hub
+once (then cached by the browser) and all inference runs locally via WebGPU. Your
+complaint text is only ever read in your browser and in the Web Worker.
+
+### Model and runtime
+
+| | |
+| --- | --- |
+| **Model** | [`onnx-community/Qwen2.5-0.5B-Instruct`](https://huggingface.co/onnx-community/Qwen2.5-0.5B-Instruct) — the ONNX build of [`Qwen/Qwen2.5-0.5B-Instruct`](https://huggingface.co/Qwen/Qwen2.5-0.5B-Instruct), a 0.5B-parameter instruction-tuned text-generation model. |
+| **Task** | **Text generation** — read an unstructured complaint and emit a single structured JSON ticket. |
+| **Runtime** | [Transformers.js v4](https://huggingface.co/blog/transformersjs-v4) (`@huggingface/transformers`), which runs ONNX models in the browser. |
+| **Acceleration** | **WebGPU** when available, with a WebAssembly (CPU) fallback. |
+| **Quantization** | `q4` on **both** WebGPU and the CPU/WASM fallback. `q4f16` is intentionally **not** used — see _Known limitations_ (it overflows to NaN on the ONNX Runtime WebGPU backend and produces a "!!!!!" loop). |
+| **One-shot prompt** | A worked input→output example is included in the prompt; a 0.5B model follows the JSON shape and honesty rules far more reliably with a concrete demonstration than with rules alone. |
+| **Validation** | [Zod](https://zod.dev/) — the model's JSON is parsed and validated against a schema; the `Ticket` TypeScript type is inferred from that same schema. |
+
+### Why this model?
+
+This feature is **structured extraction** — turn messy free text into one
+well-formed JSON object following a fixed schema and strict honesty rules. That
+is an instruction-following + JSON-generation task, which drove the choice:
+
+- **Qwen2.5-Instruct is explicitly tuned for exactly this.** The Qwen2.5 model
+  card highlights significant improvements in _instruction following_ and in
+  _generating structured outputs, especially JSON_ — the two capabilities this
+  feature depends on. (Content was rephrased for compliance with licensing
+  restrictions.) See the
+  [Qwen2.5-0.5B-Instruct model card](https://huggingface.co/Qwen/Qwen2.5-0.5B-Instruct).
+- **0.5B, chosen to actually load in the browser.** The 1.5B sibling has
+  stronger instruction-following, but in `q4` (the only numerically stable
+  precision on WebGPU — see below) its ~1.79 GB of weights plus ONNX session
+  buffers overflow available memory on many machines and fail session creation
+  with `std::bad_alloc`. The 0.5B `q4` build is **~786 MB** and loads reliably.
+  A working smaller model beats an unloadable larger one; the quality gap is
+  narrowed with a one-shot example prompt, defensive JSON parsing, and a local
+  retry. The 0.5B build is also the more battle-tested browser model (tens of
+  thousands of downloads, many live Transformers.js chat demos).
+- **It has a verified Transformers.js implementation.** `onnx-community`
+  publishes the official ONNX weights for Transformers.js, and the worker follows
+  the canonical
+  [`llama-3.2-webgpu`](https://github.com/huggingface/transformers.js-examples/tree/main/llama-3.2-webgpu)
+  text-generation example (same `AutoModelForCausalLM` + `TextStreamer` +
+  `apply_chat_template` API, warm-up pass, and interruptable stopping criteria).
+- **Why not a constrained-decoding runtime?** Hugging Face's own
+  [Github Issue Generator demo](https://github.com/huggingface/smollm/tree/main/tools/smollm_local_inference)
+  solves a near-identical problem using **WebLLM + XGrammar** for grammar-forced
+  JSON. That is a genuinely strong approach, but it means a second inference
+  runtime. Since the brief prefers Transformers.js v4 and Qwen2.5 follows a
+  JSON-shaped prompt reliably, this feature stays on one runtime and validates
+  with Zod instead (see _Known limitations_). Transformers.js does not currently
+  expose constrained/grammar decoding.
+
+### Approximate download size
+
+The one-time model download is the quantized decoder plus the tokenizer:
+
+| Backend | Weights file | Size |
+| --- | --- | --- |
+| WebGPU (`q4`) | `onnx/model_q4.onnx` | **≈ 786 MB** |
+| CPU/WASM (`q4`) | `onnx/model_q4.onnx` | **≈ 786 MB** |
+
+Plus the tokenizer (`tokenizer.json` ≈ 7 MB, `vocab.json` ≈ 2.8 MB,
+`merges.txt` ≈ 1.7 MB) and small config files. Files are cached by the browser,
+so later visits and generations reuse them with no re-download. (`q4f16` would
+download in ~483 MB, but it is unusable here — see _Known limitations_.)
+
+### Browser and hardware requirements
+
+- A **WebGPU-capable desktop browser** is strongly recommended — recent Chrome,
+  Edge, or other Chromium-based browsers. Check [WebGPU support](https://caniuse.com/webgpu).
+- A GPU with roughly **1–1.5 GB of free VRAM** for the model plus runtime
+  buffers.
+- Without WebGPU the feature falls back to the CPU (WASM) backend with `q4`
+  weights, which is **significantly slower** and needs enough free RAM; on
+  low-memory machines it may be impractical.
+- A reasonably fast connection for the one-time model download.
+
+### Expected performance
+
+- First run is slow: the ~1.2 GB download plus WebGPU shader compilation (there
+  is a one-token warm-up pass to pay that cost up front). Subsequent generations
+  reuse the loaded model and are much faster.
+- On a typical discrete GPU, generation streams at tens of tokens per second
+  (shown live as `tok/s`); a full ticket is a few hundred tokens. The CPU
+  fallback is far slower.
+- The model is loaded lazily on the first **Generate Ticket** click and reused
+  for every later generation in the session.
+
+### Structured generation and known limitations
+
+- **Prompt-based JSON, validated with Zod — not grammar-constrained.**
+  Transformers.js has no constrained-decoding API, so the model is firmly
+  prompted to emit one JSON object, and the result is then recovered and
+  validated in code:
+  1. The first balanced `{…}` object is extracted from the raw output (tolerating
+     ```json fences and any stray prose around it).
+  2. Common malformations are repaired defensively (trailing commas, curly
+     quotes) before `JSON.parse`.
+  3. The parsed object is validated with a Zod schema that coerces a
+     recognizable-but-imperfect payload into the strict ticket shape and falls
+     back to honest defaults (`"Other"` / `"Unknown"`, `""`, `[]`).
+  4. If the first attempt is unparseable, there is **one local retry** with a
+     firmer prompt. If that also fails, the UI shows a clear error.
+- **No remote repair, no hardcoded ticket.** Recovery is entirely on-device. The
+  feature never calls a remote model to fix invalid output and never silently
+  substitutes a canned ticket — if valid JSON cannot be obtained locally, it says
+  so.
+- **The ticket is a draft, not a verdict.** A small model can still misread
+  nuance, mis-rank priority, or phrase something awkwardly. Priority is
+  deliberately cautious and defaults to `Unknown`; the "missing information"
+  field exists precisely because the model is told to ask rather than invent.
+  **Always review before filing.**
+- A 0.5B model occasionally produces a near-miss JSON object on the first try;
+  the retry usually recovers it, but very long or contradictory complaints can
+  still fail validation. It is a small model — expect the odd awkward phrasing or
+  mis-ranked priority, which is exactly why every field is editable.
+- **Why `q4` and not `q4f16`?** The smaller `q4f16` build keeps `f16`
+  activations, and those overflow to `NaN` inside the current ONNX Runtime
+  WebGPU kernels for this model. The logits collapse and the model emits token 0
+  ("!") forever — an endless `"!!!!!…"` loop with no valid JSON. This is a known
+  runtime issue, not a prompt or model-quality problem
+  ([microsoft/onnxruntime#26732](https://github.com/microsoft/onnxruntime/issues/26732),
+  [huggingface/transformers.js#1317](https://github.com/huggingface/transformers.js/issues/1317)).
+  Plain `q4` keeps 4-bit weights with `f32` activations, which is numerically
+  stable on WebGPU and still GPU-accelerated, at the cost of a larger download.
+  The parser also detects a degenerate repeating-character loop and reports it
+  explicitly, so if a future/other backend regresses, the UI says what happened
+  instead of showing a misleading "no JSON" error.
+
+### How it's built (architecture)
+
+The feature is split into focused modules under
+`src/features/smart-ticket-creator/`:
+
+```text
+worker.ts           # Model init + lazy load + JSON generation + local retry (Web Worker)
+useTicketCreator.ts # React hook: owns the worker lifecycle and exposes state/actions
+prompt.ts           # System/user chat messages encoding the AI-behavior policy
+parseTicket.ts      # JSON extraction + defensive repair + Zod validation + normalize
+formatTicket.ts     # Serialize a ticket to Markdown and to JSON for the clipboard
+examples.ts         # The two sample complaints
+types.ts            # Zod ticket schema (source of truth), Ticket type, worker protocol
+components/         # ModelStatus (download progress), TicketEditor (editable fields)
+```
+
+The model is loaded lazily on the first generation, runs in a Web Worker to keep
+the UI responsive, and is reused across subsequent generations. It is a separate
+worker and model from the other features — each feature downloads its own model
+only when its route is visited, so an unrelated tab never pulls weights it
+doesn't need.
+
+### How to run and test
+
+1. `npm install` then `npm run dev`, and open the **Ticket Creator** tab (or go
+   to `/smart-ticket-creator`).
+2. Click an example chip (**Messy: Save button** or **Vague: it broke**), or type
+   your own complaint, then press **Generate Ticket**.
+3. The first run downloads the model (watch the per-file progress); later runs
+   reuse it.
+4. Review and edit any field, then **Copy Ticket** (Markdown) or **Copy JSON**.
+   **Reset** clears the input and output (the model stays loaded).
+
 ## Project structure
 
 ```text
@@ -310,7 +497,7 @@ src/
   features/
     screenshot-bug-reporter/   # ✅ implemented (SmolVLM-Instruct, VQA)
     ai-accessibility/          # ✅ implemented (Florence-2, image captioning)
-    smart-ticket-creator/
+    smart-ticket-creator/      # ✅ implemented (Qwen2.5-1.5B-Instruct, structured extraction)
     pause-and-ask/
     semantic-search/
     registry.ts  # Navigation metadata for the tab bar
