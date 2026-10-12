@@ -192,13 +192,14 @@ export function AiAccessibility() {
                   value={context}
                   onChange={(e) => setContext(e.target.value)}
                   disabled={busy}
-                  placeholder='e.g. "Hero image on the pricing page"'
+                  placeholder='e.g. "for sale" or "available for adoption"'
                   className="w-full rounded-md border border-white/10 bg-white/[0.03] px-3 py-2 text-sm text-gray-100 placeholder:text-gray-600 focus:border-indigo-400/60 focus:outline-none focus:ring-1 focus:ring-indigo-400/60 disabled:opacity-60"
                 />
                 <p className="text-xs text-gray-500">
                   The model describes only what it sees in the pixels. Context you add here is
-                  folded into the suggestion afterwards (as a purpose hint) — it does not change
-                  what the model detects. Edit the result to phrase it for its real purpose.
+                  appended as a separate sentence after the description (e.g. a shoe caption +
+                  &ldquo;for sale&rdquo; → &ldquo;…on the table. For sale.&rdquo;). It does not
+                  change what the model detects — review and edit the result before using it.
                 </p>
               </div>
 

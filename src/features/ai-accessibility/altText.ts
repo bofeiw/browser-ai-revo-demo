@@ -81,14 +81,26 @@ export function cleanCaption(raw: string): string {
 }
 
 /**
- * Apply the optional user context to a cleaned caption as a TRANSPARENT,
+ * Append the optional user context to a cleaned caption as a TRANSPARENT,
  * in-code suggestion — not as model-understood instruction.
  *
- * We keep this deliberately simple and visible: the model's visual description
- * is preserved verbatim, and the user's note about how the image is used is
- * appended as a parenthetical purpose hint for the human reviewer to fold in.
- * The user is expected to edit the final text; this is a starting point, not a
- * context-aware generation.
+ * IMPORTANT: this is a deterministic string merge, not context-aware
+ * generation. The model's visual description (what it saw in the pixels) is
+ * preserved verbatim; the user's note about how the image is used is added as a
+ * SEPARATE trailing sentence, not spliced into the model's wording.
+ *
+ * Why a separate sentence rather than a trailing clause: Florence-2's detailed
+ * captions are often several sentences ("…we see a lamp and a plant in a pot.
+ * In the background we see a wall and a photo frame."). Gluing the context onto
+ * the end of that produced nonsense like "…a photo frame for sale." — it reads
+ * as if the frame is what's for sale. Making the context its own capitalized,
+ * period-terminated sentence keeps every sentence of the description intact and
+ * attaches the note to the image as a whole:
+ *   "…a wall and a photo frame. For sale."
+ *   "A brown leather shoe. Available for adoption." (user edits as needed)
+ *
+ * We cannot invent adjectives the model didn't produce — the user is still
+ * expected to edit the final text. This is a starting point.
  *
  * Returns the caption unchanged when no context is supplied.
  */
@@ -96,12 +108,23 @@ export function applyContext(caption: string, context: string): string {
   const ctx = context.trim()
   if (!ctx || !caption) return caption
 
-  // Avoid duplicating a note the model already happens to include.
+  // Avoid duplicating a note the model (or a previous merge) already includes.
   if (caption.toLowerCase().includes(ctx.toLowerCase())) return caption
 
-  const base = caption.replace(/\.\s*$/, '')
-  const hint = ctx.replace(/\.\s*$/, '')
-  return `${base} — used as: ${hint}.`
+  // Normalize the caption to end in a single period.
+  const base = caption.replace(/[.\s]+$/, '')
+  if (!base) return caption
+
+  // Clean the context into a standalone sentence: strip any leading connector
+  // or punctuation, capitalize the first letter, and drop a trailing period
+  // (we re-add exactly one below).
+  let hint = ctx.replace(/^[\s,;.—-]+/, '').replace(/[.\s]+$/, '')
+  if (!hint) return caption
+  hint = hint.charAt(0).toUpperCase() + hint.slice(1)
+
+  // Context becomes its own sentence after the description. This never changes
+  // the meaning of any sentence the model produced.
+  return `${base}. ${hint}.`
 }
 
 /** Count characters the way the UI displays them (post-trim, Unicode-aware). */
