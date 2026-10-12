@@ -18,18 +18,19 @@ client using browser-compatible models through technologies such as
 | **Screenshot Bug Reporter** ✅ | Upload a screenshot and generate a structured bug report with a local vision-language model. |
 | **AI Accessibility** ✅ | Upload an image and generate suggested alt text with a local image-captioning model. |
 | **Smart Ticket Creator** ✅ | Convert an unstructured natural-language complaint into a structured issue ticket with a local language model. |
-| **Pause & Ask** | Analyze a live camera feed, pause on a frame, and ask questions about its content. |
+| **Pause & Ask** ✅ | Start your webcam, pause on a frame, and ask a local vision-language model natural-language questions about it. |
 | **Semantic Search** | Search through local documents using semantic similarity. |
 
-> **Status:** The **Screenshot Bug Reporter**, **AI Accessibility**, and
-> **Smart Ticket Creator** tabs are fully implemented and run real in-browser
-> inference. The remaining two tabs are still clearly labeled placeholders and
-> will be implemented in later iterations.
+> **Status:** The **Screenshot Bug Reporter**, **AI Accessibility**, **Smart
+> Ticket Creator**, and **Pause & Ask** tabs are fully implemented and run real
+> in-browser inference. The remaining tab (**Semantic Search**) is still a
+> clearly labeled placeholder and will be implemented in a later iteration.
 
 See [Screenshot Bug Reporter](#screenshot-bug-reporter-1),
-[AI Accessibility](#ai-accessibility--local-alt-text-generator), and
-[Smart Ticket Creator](#smart-ticket-creator-1) below for each feature's model,
-runtime, requirements, and known limitations.
+[AI Accessibility](#ai-accessibility--local-alt-text-generator),
+[Smart Ticket Creator](#smart-ticket-creator-1), and
+[Pause & Ask](#pause--ask-1) below for each feature's model, runtime,
+requirements, and known limitations.
 
 ## Tech stack
 
@@ -487,6 +488,161 @@ doesn't need.
 4. Review and edit any field, then **Copy Ticket** (Markdown) or **Copy JSON**.
    **Reset** clears the input and output (the model stays loaded).
 
+## Pause & Ask
+
+Start your webcam, watch the live preview, then **Pause Frame** to freeze the
+current view. Type a natural-language question in **Ask about this frame** —
+_"What objects are visible?"_, _"What color is the object in the center?"_,
+_"How many people are in the frame?"_ — and a local vision-language model answers
+based on that frozen image. You can ask as many questions as you like about the
+same frame, then **Resume Camera** for a new one. An optional **Live AI
+Description** toggle periodically narrates the live scene.
+
+**Nothing leaves the device.** There is no backend and no inference API. The
+camera stream is rendered locally, frames are captured to an in-memory canvas,
+and the model (downloaded once from the Hugging Face Hub, then cached by the
+browser) runs entirely in your browser via WebGPU. **Captured frames and your
+questions are never uploaded.**
+
+### Model and runtime
+
+| | |
+| --- | --- |
+| **Model** | [`onnx-community/LFM2.5-VL-450M-ONNX`](https://huggingface.co/onnx-community/LFM2.5-VL-450M-ONNX) — Liquid AI's [LFM2.5-VL-450M](https://huggingface.co/docs/transformers/main/model_doc/lfm2_vl), a ~0.45B-parameter instruction-tuned vision-language model (LFM2.5-350M language backbone + SigLIP2 NaFlex 86M vision encoder), converted to ONNX for Transformers.js. |
+| **Task** | **Visual question answering** — accepts an image **plus** a free-form question and generates an answer grounded in the image. The same model also produces the short scene captions for Live AI Description. |
+| **Runtime** | [Transformers.js v4](https://huggingface.co/blog/transformersjs-v4) (`@huggingface/transformers`), which runs ONNX models in the browser. |
+| **Acceleration** | **WebGPU** when available, with a WebAssembly (CPU) fallback. |
+| **Quantization** | Per-submodel: `fp16` vision encoder + token embeddings and `q4f16` decoder on WebGPU (when the adapter supports `shader-f16`); `q4` everywhere on the CPU/WASM fallback (and on WebGPU without `shader-f16`). |
+
+### Why this model?
+
+The brief requires **genuine visual question answering** — the model must take a
+captured frame *and* an arbitrary question and answer about that specific image —
+not fixed-task image captioning. That ruled some otherwise-capable models in and
+out:
+
+- **LFM2.5-VL-450M is a real instruction-following VLM.** It accepts interleaved
+  image + text and follows free-form questions, so it genuinely answers _"what
+  color is the object in the center?"_ rather than only emitting a canned
+  caption. It scores well on real-world VQA for its size (e.g. RealWorldQA 58.4,
+  MMBench-dev-en 60.9 on its [model card](https://huggingface.co/onnx-community/LFM2.5-VL-450M-ONNX)).
+- **It is purpose-built for exactly this scenario.** Liquid AI ships an official
+  [real-time video-stream captioning WebGPU demo](https://docs.liquid.ai/examples/web/vl-webgpu-demo)
+  for this model family and documents the exact Transformers.js v4 usage
+  (`AutoModelForImageTextToText` + the `dtype` map this worker uses). It is part
+  of the [Transformers.js v4 demo collection](https://huggingface.co/collections/webml-community/transformersjs-v4-demos).
+- **It's small enough for an interactive, repeatable loop.** At ~0.45B
+  parameters (~350 MB quantized) it loads far faster and uses far less VRAM than
+  the 2.2B SmolVLM-Instruct used by the Bug Reporter — important when the user
+  asks several questions in a row and (optionally) runs a periodic caption loop.
+- **One model covers both modes.** Because it does both VQA and captioning well,
+  Live AI Description reuses the *same* loaded model instead of downloading a
+  second one. No extra GPU memory is spent on a dedicated captioner.
+- **Florence-2 was considered for captioning and rejected as the primary model.**
+  Florence-2 (used by the AI Accessibility tab) only responds to a fixed set of
+  task tokens and is **not** instruction-following — it cannot answer an
+  arbitrary question about a frame, which is the whole point of this feature. It
+  is therefore not used here.
+
+### Approximate download size
+
+With the WebGPU `fp16`/`q4f16` precision above, the first use downloads roughly
+**~350–400 MB** of model weights (fp16 vision encoder + token embeddings, q4f16
+decoder, plus tokenizer/processor config). The exact total varies with whether
+the adapter supports `shader-f16` (fp16 vs. the `q4` fallback submodels). Files
+are cached by the browser, so later visits and questions reuse them with no
+re-download.
+
+### Camera permission requirements
+
+- The webcam is requested **only when you click Start Camera** — never on page
+  load — via the browser's [MediaDevices `getUserMedia`](https://developer.mozilla.org/docs/Web/API/MediaDevices/getUserMedia)
+  API, and the browser will prompt for permission.
+- Camera access requires a **secure context**: `https://` or `http://localhost`.
+  Over plain `http://` on a remote host the browser blocks `getUserMedia` and the
+  feature reports that the camera is unavailable.
+- Denied permission, no camera present, or a camera already in use by another app
+  are all handled gracefully with a clear message.
+- **Stop Camera** releases every media track, and the camera is also released
+  automatically when you navigate away from the tab (component unmount).
+
+### Browser and hardware requirements
+
+- A **WebGPU-capable desktop browser** is strongly recommended — recent Chrome,
+  Edge, or other Chromium-based browsers. Check [WebGPU support](https://caniuse.com/webgpu).
+- A webcam, and a GPU with roughly **1–2 GB of free VRAM** for the model plus
+  runtime buffers.
+- Without WebGPU the feature falls back to the CPU (WASM) backend with `q4`
+  weights, which is **significantly slower** (expect multi-second answers) but
+  still fully local.
+- A reasonably fast connection for the one-time model download.
+
+### Expected performance
+
+- First run is slow: the one-time model download plus WebGPU shader compilation.
+  Subsequent questions reuse the loaded model and are much faster.
+- On a typical discrete GPU, answers stream at tens of tokens per second; a short
+  answer is a second or two after the first run. The CPU fallback is far slower.
+- **Only one inference runs at a time.** Asking a question while another is in
+  flight is ignored, and the Live AI Description loop never queues work: the next
+  caption is scheduled only *after* the previous one finishes (a fixed delay
+  between completions), so inference requests can never pile up.
+- Live AI Description runs **only while the camera is live** — it pauses
+  automatically while you ask about a frozen frame, so captioning and VQA never
+  compete for the GPU.
+
+### Known limitations
+
+- **Answers are a draft, not ground truth — always sanity-check them.** It is a
+  compact on-device model; it can miss objects, miscount, or misjudge colors, and
+  it is explicitly **not well suited to fine-grained OCR** (reading small text on
+  a sign) or knowledge-intensive questions. The system prompt asks it to express
+  uncertainty rather than invent details, but it can still be confidently wrong.
+- **No fake or canned answers.** Every answer is generated live from the actual
+  captured frame and your actual question. There are no hardcoded responses and
+  no remote/cloud fallback — if local inference can't run, the feature reports an
+  error instead of silently calling an API.
+- First run is slow because of the model download and WebGPU shader compilation.
+- The CPU/WASM fallback can be impractically slow and memory-hungry for the
+  (optional) continuous caption loop on low-end machines; disable Live AI
+  Description there and use Pause & Ask on demand.
+
+### How it's built (architecture)
+
+The feature is split into focused modules under `src/features/pause-and-ask/`:
+
+```text
+worker.ts         # Model init + lazy load + VQA/caption inference (Web Worker)
+useVqa.ts         # React hook: owns the worker lifecycle, VQA + caption actions, status
+useCamera.ts      # React hook: webcam start/stop/pause/resume + capture + cleanup
+camera.ts         # Framework-free MediaDevices + canvas frame-capture helpers
+types.ts          # CapturedFrame, device/support types, worker message protocol
+components/        # CameraStage (preview + controls), ModelStatus (download progress)
+```
+
+Camera handling, frame capture, model loading/inference, and UI state are kept in
+separate modules. The model is loaded lazily on the first question, runs in a Web
+Worker to keep the preview responsive, and is reused for every subsequent
+question (including a brand-new paused frame). It is a separate worker and model
+from the other tabs — each feature downloads its own model only when its route is
+visited, so an unrelated tab never pulls weights it doesn't need.
+
+### How to run and test
+
+1. `npm install` then `npm run dev`, and open the **Pause & Ask** tab (or go to
+   `/pause-and-ask`). Use `http://localhost` or HTTPS so the browser allows the
+   camera.
+2. Click **Start Camera** and grant permission. You should see your live webcam.
+3. Click **Pause Frame** to freeze the current view (a "Frame paused" badge
+   appears).
+4. Type a question (or click an example chip) and press **Ask AI**. The first run
+   downloads the model (watch the per-file progress); later questions reuse it.
+   The answer streams in below.
+5. Ask more questions about the **same** frozen frame, then **Resume Camera** for
+   a new one. Optionally enable **Live AI Description** while live.
+6. **Stop Camera** releases the webcam; navigating away does the same
+   automatically.
+
 ## Project structure
 
 ```text
@@ -498,7 +654,7 @@ src/
     screenshot-bug-reporter/   # ✅ implemented (SmolVLM-Instruct, VQA)
     ai-accessibility/          # ✅ implemented (Florence-2, image captioning)
     smart-ticket-creator/      # ✅ implemented (Qwen2.5-1.5B-Instruct, structured extraction)
-    pause-and-ask/
+    pause-and-ask/             # ✅ implemented (LFM2.5-VL-450M, live camera VQA)
     semantic-search/
     registry.ts  # Navigation metadata for the tab bar
   hooks/         # Feature-specific hooks (added later)
