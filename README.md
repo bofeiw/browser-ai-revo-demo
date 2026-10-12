@@ -2,7 +2,7 @@
 
 **5 practical AI features. No backend. No cloud. Just your browser.**
 
-A React + TypeScript application that demonstrates five practical use cases for
+A React + TypeScript application that demonstrates practical use cases for
 local, in-browser AI. Each feature is designed to eventually run entirely on the
 client using browser-compatible models through technologies such as
 [Transformers.js](https://huggingface.co/docs/transformers.js), **WebGPU**, and
@@ -15,22 +15,21 @@ client using browser-compatible models through technologies such as
 
 | Tab | What it does |
 | --- | --- |
-| **Screenshot Bug Reporter** ✅ | Upload a screenshot and generate a structured bug report with a local vision-language model. |
 | **AI Accessibility** ✅ | Upload an image and generate suggested alt text with a local image-captioning model. |
 | **Smart Ticket Creator** ✅ | Convert an unstructured natural-language complaint into a structured issue ticket with a local language model. |
 | **Pause & Ask** ✅ | Start your webcam, pause on a frame, and ask a local vision-language model natural-language questions about it. |
-| **Semantic Search** | Search through local documents using semantic similarity. |
+| **Semantic Search** ✅ | Search a collection of support tickets by meaning — a local embedding model turns text into vectors and ranks results by cosine similarity, with a non-AI keyword-search comparison. |
+| **AI Background Remover** ✅ | Upload an image, strip its background with a local saliency-segmentation model, and download a transparent PNG. |
 
-> **Status:** The **Screenshot Bug Reporter**, **AI Accessibility**, **Smart
-> Ticket Creator**, and **Pause & Ask** tabs are fully implemented and run real
-> in-browser inference. The remaining tab (**Semantic Search**) is still a
-> clearly labeled placeholder and will be implemented in a later iteration.
+> **Status:** All five tabs are fully implemented and run real in-browser
+> inference (Semantic Search uses a local embedding model, not a generative one).
 
-See [Screenshot Bug Reporter](#screenshot-bug-reporter-1),
-[AI Accessibility](#ai-accessibility--local-alt-text-generator),
-[Smart Ticket Creator](#smart-ticket-creator-1), and
-[Pause & Ask](#pause--ask-1) below for each feature's model, runtime,
-requirements, and known limitations.
+See [AI Accessibility](#ai-accessibility--local-alt-text-generator),
+[Smart Ticket Creator](#smart-ticket-creator-1),
+[Pause & Ask](#pause--ask-1),
+[Semantic Search](#semantic-search-1), and
+[AI Background Remover](#ai-background-remover-1) below for each feature's model,
+runtime, requirements, and known limitations.
 
 ## Tech stack
 
@@ -60,115 +59,6 @@ npm run build
 npm run preview
 ```
 
-## Screenshot Bug Reporter
-
-Upload a screenshot of a web UI, optionally add a sentence of context (e.g.
-_"The Save button doesn't work"_), and a local vision-language model drafts a
-structured bug report: title, observable description, visible error text,
-affected UI elements, a suggested severity, and the information still missing to
-investigate. Every field is editable, and the report can be copied as Markdown.
-
-**Nothing leaves the device.** The model is downloaded from the Hugging Face Hub
-once (then cached by the browser) and all inference runs locally via WebGPU.
-
-### Model and runtime
-
-| | |
-| --- | --- |
-| **Model** | [`HuggingFaceTB/SmolVLM-Instruct`](https://huggingface.co/HuggingFaceTB/SmolVLM-Instruct) — a 2.2B-parameter instruction-tuned vision-language model (Idefics3 architecture, SmolLM2-1.7B language backbone, SigLIP-SO400M vision encoder). |
-| **Runtime** | [Transformers.js v4](https://huggingface.co/blog/transformersjs-v4) (`@huggingface/transformers`), which runs ONNX models in the browser. |
-| **Acceleration** | **WebGPU** when available, with a WebAssembly (CPU) fallback. |
-| **Quantization** | Per-submodel 4-bit: `q4f16` on WebGPU, `q4` on the CPU/WASM fallback (f16 is poorly supported on CPU). |
-
-### Why this model?
-
-The task is **visual question answering** — reading a screenshot and following a
-free-form instruction — not fixed-task image captioning. That distinction drove
-the choice:
-
-- **SmolVLM-500M-Instruct is a genuine instruction-following VLM.** It accepts
-  arbitrary interleaved image + text and produces free-form text, so it can be
-  asked to describe a UI, read visible error text, and fill in a report
-  template.
-- **Florence-2 was evaluated and rejected.** Despite being a capable, small
-  vision model, Florence-2 only responds to a fixed set of task prompts
-  (`<CAPTION>`, `<OCR>`, `<OD>`, grounding, etc.) and is **not** an
-  instruction-following model — it cannot be asked an arbitrary question about
-  an image. See the [Florence-2 paper](https://arxiv.org/abs/2311.06242).
-- **2.2B over the 256M/500M siblings.** The smaller SmolVLM checkpoints were
-  tried first (they download in ~400 MB) but could not reliably read fine UI
-  text — on a realistic form screenshot they missed a prominent red validation
-  error and hallucinated UI elements. The 2.2B model uses the full
-  SigLIP-SO400M vision encoder and the 1.7B SmolLM2 backbone, which the
-  [SmolVLM paper](https://arxiv.org/abs/2504.05299) reports "rivals
-  state-of-the-art VLMs consuming twice the GPU memory." That extra capacity is
-  what the task needs.
-- **Why not Qwen2-VL-2B?** Qwen2-VL has excellent OCR, but its ONNX vision
-  encoder does not quantize (the weights stay ~2.6 GB), pushing the total
-  download to ~4.5 GB — impractical for a browser demo. SmolVLM-Instruct's
-  encoder quantizes cleanly, keeping it to ~1.4 GB.
-- **It has a documented, working browser implementation** (the official SmolVLM
-  WebGPU demo spaces and the `smolvlm-webgpu` example in
-  [transformers.js-examples](https://github.com/huggingface/transformers.js-examples)),
-  which this feature's worker is based on.
-
-### Approximate download size
-
-With `q4f16` quantization, the first analysis downloads roughly **~1.4 GB** of
-model weights (decoder ≈ 965 MB, vision encoder ≈ 248 MB, token embeddings
-≈ 201 MB, plus tokenizer/config). Files are cached by the browser, so subsequent
-visits and analyses reuse them with no re-download.
-
-### Browser and hardware requirements
-
-- A **WebGPU-capable desktop browser** is strongly recommended — recent Chrome,
-  Edge, or other Chromium-based browsers. Check [WebGPU support](https://caniuse.com/webgpu).
-- A reasonably capable GPU with roughly **2–3 GB of free VRAM** for the model
-  plus runtime buffers.
-- Without WebGPU the feature falls back to the CPU (WASM) backend with `q4`
-  weights, which is **significantly slower** and needs enough free RAM; on
-  low-memory machines it may be impractical.
-- A reasonably fast connection for the one-time ~1.4 GB model download.
-
-### Known limitations
-
-- **The report is a draft, not a verdict.** A screenshot does not prove a bug
-  exists. The report is assembled from what the model observes in the image;
-  severity stays "Unknown" and the "missing information" field always lists what
-  a human still needs to establish. It is a compact on-device model and can make
-  mistakes — **always review before filing.**
-- **Why a multi-step approach?** Small VLMs reliably fail when asked to emit one
-  large JSON object: they hallucinate and fall into token-repetition loops.
-  Instead the feature asks a few short, focused questions (describe the screen,
-  any visible error text, which UI elements) and builds the structured report in
-  code. Generation also uses `no_repeat_ngram_size` to prevent repetition loops.
-- Small VLMs can misread fine text; treat extracted error messages as
-  best-effort, and correct them in the editable fields.
-- First run is slow because of the model download and WebGPU shader
-  compilation; later runs reuse the loaded model.
-- No remote/cloud fallback exists by design. If local inference can't run, the
-  feature reports an error instead of silently calling an API.
-
-### How it's built (architecture)
-
-The feature is split into focused modules under
-`src/features/screenshot-bug-reporter/`:
-
-```text
-worker.ts          # Model init + multi-step inference + report assembly (Web Worker)
-useBugReporter.ts  # React hook: owns the worker lifecycle and exposes state/actions
-image.ts           # Image validation + downscaling + object-URL cleanup
-prompt.ts          # The short, focused questions put to the model
-formatReport.ts    # Serialize a report to Markdown for the clipboard
-types.ts           # BugReport, Severity, and the worker message protocol
-components/         # Dropzone, ModelStatus (download progress), ReportEditor
-```
-
-The model is loaded lazily on the first analysis, runs in a Web Worker to keep
-the UI responsive, and is reused across subsequent analyses. The report is
-assembled deterministically in code from the model's short per-question answers
-(no large-JSON parsing, no extra schema dependency).
-
 ## AI Accessibility — Local Alt Text Generator
 
 Upload an image (PNG, JPEG, or WebP), pick how much detail you want, and a local
@@ -195,8 +85,7 @@ never uploaded.
 ### Why this model?
 
 Alt text is fundamentally an **image-captioning** task — turn pixels into a short
-visual description — not visual question answering. That drove a different choice
-than the Bug Reporter's SmolVLM:
+visual description — not visual question answering. That drove the model choice:
 
 - **Florence-2 is purpose-built for captioning.** Its dedicated caption tasks
   produce clean, descriptive sentences out of the box, which is exactly the
@@ -299,9 +188,9 @@ components/        # Dropzone, ModelStatus (download progress), AltTextResult (e
 The model is loaded lazily on the first generation, runs in a Web Worker to keep
 the UI responsive, and is reused across subsequent images. The worker caches the
 preprocessed vision inputs per image, so switching the detail level or
-regenerating doesn't re-encode the same pixels. It is a separate worker and model
-from the Screenshot Bug Reporter — each feature downloads its own model only when
-its route is visited, so an unrelated tab never pulls weights it doesn't need.
+regenerating doesn't re-encode the same pixels. Each feature downloads its own
+model only when its route is visited, so an unrelated tab never pulls weights it
+doesn't need.
 
 ## Smart Ticket Creator
 
@@ -532,9 +421,9 @@ out:
   (`AutoModelForImageTextToText` + the `dtype` map this worker uses). It is part
   of the [Transformers.js v4 demo collection](https://huggingface.co/collections/webml-community/transformersjs-v4-demos).
 - **It's small enough for an interactive, repeatable loop.** At ~0.45B
-  parameters (~350 MB quantized) it loads far faster and uses far less VRAM than
-  the 2.2B SmolVLM-Instruct used by the Bug Reporter — important when the user
-  asks several questions in a row and (optionally) runs a periodic caption loop.
+  parameters (~350 MB quantized) it loads fast and uses little VRAM — important
+  when the user asks several questions in a row and (optionally) runs a periodic
+  caption loop.
 - **One model covers both modes.** Because it does both VQA and captioning well,
   Live AI Description reuses the *same* loaded model instead of downloading a
   second one. No extra GPU memory is spent on a dedicated captioner.
@@ -643,6 +532,392 @@ visited, so an unrelated tab never pulls weights it doesn't need.
 6. **Stop Camera** releases the webcam; navigating away does the same
    automatically.
 
+## Semantic Search
+
+Search a small collection of support tickets **by meaning**, not just by
+keywords. Type a natural-language query — _"My edits disappear after I leave the
+page"_ — and the app ranks the tickets by how semantically similar they are to
+your query, surfacing the unsaved-changes tickets even though they share almost
+no literal words with the query. A **Keyword Search** mode (a deterministic,
+non-AI text matcher) runs on the same data so you can see exactly where
+meaning-based retrieval helps and where literal matching falls short.
+
+The whole pipeline runs locally: a local embedding model turns each document
+into a vector, your query is embedded the same way, and results are ranked by
+cosine similarity — **no backend, no vector database, no cloud embeddings
+API, and no generative LLM.** You can add, edit, and remove documents, and the
+UI clearly flags when the index is outdated so you can reindex.
+
+**Nothing leaves the device.** The embedding model is downloaded from the
+Hugging Face Hub once (then cached by the browser); your documents and queries
+are only ever read in your browser and in the Web Worker — they are never
+uploaded.
+
+### Model and runtime
+
+| | |
+| --- | --- |
+| **Model** | [`Xenova/all-MiniLM-L6-v2`](https://huggingface.co/Xenova/all-MiniLM-L6-v2) — the ONNX build of [`sentence-transformers/all-MiniLM-L6-v2`](https://huggingface.co/sentence-transformers/all-MiniLM-L6-v2), a ~22.7M-parameter sentence-embedding model that maps text to a **384-dimensional** dense vector for semantic similarity. |
+| **Task** | **Feature extraction (text embeddings)** — this is *not* a generative model. It only produces vectors; all ranking is plain arithmetic in the app. |
+| **Runtime** | [Transformers.js v4](https://huggingface.co/blog/transformersjs-v4) (`@huggingface/transformers`), which runs ONNX models in the browser. |
+| **Acceleration** | **WebAssembly (CPU)** by default (the library's default quantized weights); **WebGPU** (`fp32`) when available. See _Why WASM by default?_ below. |
+| **Pooling / normalization** | `{ pooling: 'mean', normalize: true }` — the exact settings documented on the model card. Mean-pooled token embeddings, then L2-normalized to unit length. |
+| **Query/document prefixes** | **None.** Unlike E5/BGE/nomic-style models, all-MiniLM-L6-v2 does not require `query:`/`passage:` prefixes, so queries and documents are embedded identically. |
+
+### Why this model?
+
+This feature is **semantic similarity over short English support tickets** —
+turn text into vectors and rank by closeness. That is an embedding task, not a
+generative one, which drove the choice:
+
+- **It is purpose-built for exactly this.** all-MiniLM-L6-v2 is a
+  sentence-transformers model that maps sentences and short paragraphs to a
+  384-d dense vector space for clustering and semantic search. (Content was
+  rephrased for compliance with licensing restrictions.) See the
+  [model card](https://huggingface.co/sentence-transformers/all-MiniLM-L6-v2).
+- **It is tiny and fast.** At ~22.7M parameters (~23 MB quantized), it downloads
+  in seconds and embeds a couple dozen short documents effectively instantly —
+  the right scale for an interactive demo, and far smaller than the generative
+  models used by the other tabs.
+- **It has the canonical, documented Transformers.js implementation.** The model
+  card's own example is the `feature-extraction` pipeline with
+  `{ pooling: 'mean', normalize: true }` — exactly what this feature's worker
+  does — and it appears throughout the official
+  [Transformers.js examples](https://github.com/huggingface/transformers.js-examples).
+- **No prefixes to get wrong.** Newer embedding models (E5, BGE, nomic-embed,
+  EmbeddingGemma) often need task-specific `query:`/`passage:` prefixes and
+  mishandling them quietly degrades results. all-MiniLM-L6-v2 needs none, which
+  keeps the demo simple and correct.
+- **A generative model would be the wrong tool.** The brief explicitly rules out
+  a large generative LLM here; embeddings + cosine similarity is the standard,
+  well-understood way to do meaning-based retrieval without one.
+
+### Why WASM by default (not WebGPU)?
+
+For a ~23 MB encoder over a couple dozen short strings, the WebAssembly (CPU)
+backend embeds the whole collection in well under a second, has the **widest
+browser compatibility**, and avoids WebGPU shader-compilation latency on the
+first call. The brief explicitly allows preferring WASM when it offers better
+compatibility or a simpler implementation for a small embedding model, so the
+CPU path is the default. On that path the worker lets Transformers.js pick its
+default quantized weights and CPU backend rather than forcing a `device`/`dtype`
+— forcing `device: 'wasm'` is in fact rejected by ONNX Runtime web, and a forced
+quantization can name a file the repo doesn't ship. When WebGPU is available the
+worker uses it with `fp32` weights (numerically safe and still accelerated); the
+ranking is identical either way.
+
+### Approximate download size
+
+The one-time download is the quantized encoder plus the tokenizer:
+
+| Backend | Weights file | Approx. size |
+| --- | --- | --- |
+| CPU (default quantized) | `onnx/model_quantized.onnx` | **≈ 23 MB** |
+| WebGPU (`fp32`) | `onnx/model.onnx` | **≈ 90 MB** |
+
+Plus the tokenizer (`tokenizer.json`, `vocab.txt`) and small config files
+(a few MB total). Files are cached by the browser, so later visits and searches
+reuse them with no re-download. This is by far the smallest model in the app.
+
+### How indexing works
+
+1. **Lazy load.** The embedding model is downloaded and initialized on the first
+   **Index documents** click (or first search), in a Web Worker, and reused for
+   the rest of the session.
+2. **Embed in batches.** Each document's title + description is embedded (mean
+   pooling + L2 normalization) in batches, and the worker streams genuine
+   per-document progress to the UI (`done / total`).
+3. **Store vectors in memory.** The resulting 384-d unit vectors are kept in an
+   in-memory `Map` keyed by document id — a plain array of vectors, **not** a
+   vector database. For this dataset size that is both correct and instant.
+4. **Reuse unchanged embeddings.** Each stored vector is tagged with a hash of
+   the exact text it was computed from. On **Reindex**, only documents whose
+   text changed (or that were newly added) are re-embedded; unchanged documents
+   keep their cached vectors, and vectors for removed documents are pruned. The
+   UI marks the index **outdated** whenever the collection has drifted from what
+   was indexed.
+
+### How cosine similarity is calculated
+
+Because the embeddings are L2-normalized (unit length), cosine similarity
+reduces to a dot product:
+
+```text
+cos(a, b) = (a · b) / (‖a‖ · ‖b‖)   and   ‖a‖ = ‖b‖ = 1   ⇒   cos(a, b) = a · b
+```
+
+At search time the query is embedded with the **same** model and settings, the
+cosine similarity between the query vector and every document vector is
+computed, and results are sorted by descending similarity. The implementation in
+[`similarity.ts`](src/features/semantic-search/similarity.ts) still divides by
+the norms defensively, so it stays mathematically correct even for
+un-normalized input.
+
+> **Scores are relative ranking signals, not calibrated confidence
+> probabilities.** A higher score means "more similar than the others in this
+> list"; the absolute number is only meaningful compared within the same result
+> set. The feature deliberately does **not** apply an arbitrary universal
+> relevance threshold.
+
+### Semantic vs. Keyword search
+
+The **Keyword Search** mode is a deterministic, dependency-free lexical matcher
+(see [`keywordSearch.ts`](src/features/semantic-search/keywordSearch.ts)): it
+lowercases and tokenizes text, removes stop-words, applies light stemming
+(plural/`-ing`/`-ed`), and scores documents by how many distinct query terms
+they contain, with a small bonus for repeats and exact-phrase hits. It is a
+**fair, reasonable** baseline — not sabotaged — and it uses the same dataset as
+semantic search. Its fundamental limitation is that it can only match literal
+words: a query like _"My edits disappear after I leave the page"_ finds nothing
+useful by keywords, while semantic search surfaces the unsaved-changes tickets.
+That contrast is the whole point of offering both.
+
+### Example dataset
+
+The demo ships with ~22 fictional support tickets (static test data, **not**
+mocked AI output) in
+[`sampleTickets.ts`](src/features/semantic-search/sampleTickets.ts), grouped into
+clusters that describe the same underlying issue in different words (unsaved
+edits, slow performance, sign-in problems, email delivery, billing, …) plus a
+few unrelated distractors, so both strong and imperfect matches are visible.
+
+### Browser and hardware requirements
+
+- Works in any **modern desktop browser** — because the default backend is
+  WebAssembly, WebGPU is **not** required for this feature (it's used only as an
+  optional speed-up).
+- Modest memory: the model is ~23 MB and the vectors for a few dozen documents
+  are negligible.
+- A connection fast enough for the one-time ~23 MB model download.
+- Errors (interrupted download, out-of-memory) are caught and surfaced in the UI
+  instead of failing silently; there is no cloud fallback by design.
+
+### Known limitations
+
+- **Small model, short-text sweet spot.** all-MiniLM-L6-v2 is tuned for short
+  English sentences. It can miss nuance, struggle with very long documents
+  (inputs are truncated to the model's max sequence length), and is weaker on
+  non-English text or domain jargon.
+- **Scores are relative, not absolute** (see above) — don't read a raw cosine
+  value as a probability or compare values across different queries.
+- **Quantization changes the numbers slightly.** `q8`/`fp32` weights can produce
+  marginally different vectors than full-precision PyTorch, which can nudge the
+  ordering of near-ties. Rankings are stable in practice for this dataset.
+- **In-memory only.** The index lives in memory for the session; it is not
+  persisted (IndexedDB persistence was intentionally left out to keep the demo
+  lightweight, as the brief allows). Reloading the page re-indexes on demand.
+- **No document upload / parsing.** By design there is no PDF/OCR/file ingestion
+  — just short text documents you type or edit.
+
+### How it's built (architecture)
+
+The feature is split into focused modules under `src/features/semantic-search/`:
+
+```text
+worker.ts            # Model init + lazy load + batched document/query embedding (Web Worker)
+useSemanticSearch.ts # React hook: worker lifecycle, document collection, in-memory index, search
+similarity.ts        # dot / norm / cosine similarity + ranking (pure functions)
+keywordSearch.ts     # Deterministic non-AI keyword matcher (the comparison baseline)
+sampleTickets.ts     # The static example ticket dataset
+types.ts             # TicketDoc, IndexedDoc, SearchResult, text hashing, worker protocol
+components/          # ModelStatus (download + indexing progress), DocumentList (add/edit/remove), SearchResults
+```
+
+Embedding (the only AI part), similarity math, keyword matching, the sample
+data, and the UI are each isolated. The embedding model is loaded lazily, runs
+in a Web Worker to keep the UI responsive, and is reused across indexing and
+every search. It is a separate worker and model from the other tabs — each
+feature downloads its own model only when its route is visited, so an unrelated
+tab never pulls weights it doesn't need.
+
+### How to run and test
+
+1. `npm install` then `npm run dev`, and open the **Semantic Search** tab (or go
+   to `/semantic-search`).
+2. Click **Index documents** — the first time, watch the one-time model download,
+   then the per-document embedding progress. The badge flips to **Index up to
+   date**.
+3. Type a query (or click an example chip such as _"My edits disappear after I
+   leave the page"_) and press **Search**. The unsaved-changes tickets should
+   rank at the top, each with its cosine score.
+4. Toggle to **Keyword Search** and run the same query to see literal matching
+   miss the differently worded tickets.
+5. **Add a document**, or edit/remove one — the index is marked **outdated**;
+   click **Reindex documents** (only changed/new documents are re-embedded).
+6. **Reset collection** restores the sample tickets and clears the index.
+
+## AI Background Remover
+
+Upload an image (PNG, JPEG, or WebP), click **Remove Background**, and a local
+AI model cuts the foreground out of the background. The result is shown on a
+checkerboard (so transparency is visible) behind a draggable **before/after
+comparison slider**, and you can **Download Transparent PNG** — a real PNG with
+an alpha channel, exported at the source resolution.
+
+**Nothing leaves the device.** The model is downloaded from the Hugging Face Hub
+once (then cached by the browser) and all segmentation, mask compositing, and PNG
+encoding run locally in your browser and a Web Worker. **Your images are never
+uploaded**, and there is no cloud fallback.
+
+### Model and runtime
+
+| | |
+| --- | --- |
+| **Model** | [`briaai/RMBG-1.4`](https://huggingface.co/briaai/RMBG-1.4) — BRIA AI's RMBG v1.4, an [IS-Net](https://github.com/xuebinqin/DIS)-based **saliency segmentation** model (~44M parameters) that predicts a single-channel foreground alpha matte, published with ONNX weights tagged for Transformers.js. The `fp32` ONNX weights are roughly **~170 MB**. |
+| **Task** | **Image segmentation / foreground matting** — the model outputs a per-pixel foreground probability in `[0, 1]`, used directly as an alpha mask. |
+| **Runtime** | [Transformers.js v4](https://huggingface.co/blog/transformersjs-v4) (`@huggingface/transformers`), which runs ONNX models in the browser via `AutoModel` + `AutoProcessor` + `RawImage`. |
+| **Acceleration** | **WebGPU** when available, with a WebAssembly (CPU) fallback. |
+| **Precision** | `fp32` on **both** WebGPU and the CPU/WASM fallback. RMBG-1.4's ONNX export does not ship a reliable `q4f16` variant, and `f16` is poorly supported on CPU, so `fp32` is the safe, documented precision on both devices. |
+
+### License and usage restrictions ⚠️
+
+**RMBG v1.4 is released for _non-commercial use only_.** It is distributed under
+BRIA AI's [`bria-rmbg-1.4` license](https://bria.ai/bria-huggingface-model-license-agreement/)
+(a Creative Commons, non-commercial agreement). Commercial use requires a
+separate paid license from BRIA.
+
+- This tab is a **non-commercial proof of concept** for a technical article, so
+  the model's license fits that use.
+- If you need background removal **for commercial use**, swap in a
+  commercially-licensed model. The code is model-agnostic — change `MODEL_ID` in
+  [`types.ts`](src/features/background-remover/types.ts). Good options:
+  - [`Xenova/modnet`](https://huggingface.co/Xenova/modnet) — **Apache-2.0**,
+    uses the same Transformers.js API and output format, but is a **portrait /
+    person matting** model only (not general objects).
+  - BRIA's own commercially-licensed RMBG tiers (via a paid BRIA agreement).
+- Always re-check the model card before shipping; license terms can change.
+
+### Why this model?
+
+The brief calls for a background remover that handles **product photos,
+portraits, and everyday objects** and runs **entirely in the browser**. That
+ruled candidates in and out:
+
+- **RMBG-1.4 is general-purpose, not portrait-only.** BRIA trained it on a
+  balanced mix of objects, e-commerce content, people, and animals (its model
+  card reports ~45% objects-only, ~25% people-with-objects, ~17% people-only),
+  so it handles the broad subject range the brief asks for — unlike portrait
+  matting models that assume a person is present.
+- **It has a verified, working browser implementation.** It ships ONNX weights
+  tagged `transformers.js` and `background-removal`, and is the model behind
+  several published in-browser demos (e.g. Addy Osmani's `bg-remove`, the
+  Backblaze Transformers.js sample). This feature's worker follows the documented
+  `AutoModel` + `AutoProcessor` + `RawImage` usage shown on the sibling
+  [`Xenova/modnet` card](https://huggingface.co/Xenova/modnet) (same output
+  format), scaling the `[0,1]` matte to `[0,255]` and resizing it back to the
+  original dimensions.
+- **It's small.** At ~44M parameters the ONNX weights are a modest one-time
+  download — far lighter than the generative VLMs used by other tabs — and it
+  fits comfortably in GPU memory.
+- **MODNet was evaluated and kept only as the commercial-friendly fallback.**
+  `Xenova/modnet` is Apache-2.0 (nice for licensing) but is trained for portrait
+  matting, so it degrades on products and non-person objects. For the demo's
+  general-purpose brief, RMBG-1.4's quality wins; MODNet is documented above as
+  the drop-in commercial alternative.
+
+### Approximate download size
+
+The first background removal downloads roughly **~170 MB** of model weights
+(the RMBG-1.4 `fp32` ONNX file — the model is ~44M parameters, but stored at full
+precision) plus small preprocessor/config files. Files are cached by the browser,
+so later visits and images reuse them with no re-download.
+
+### Browser and hardware requirements
+
+- A **WebGPU-capable desktop browser** is recommended — recent Chrome, Edge, or
+  other Chromium-based browsers. Check [WebGPU support](https://caniuse.com/webgpu).
+  It also runs on the **WebAssembly (CPU)** fallback in any modern browser,
+  just more slowly.
+- A GPU with roughly **1 GB of free VRAM** for the model plus runtime buffers
+  (the fallback uses system RAM instead).
+- A connection fast enough for the one-time ~170 MB model download.
+- Very large uploads are downscaled to a 2048 px longest edge before processing
+  to cap peak memory; aspect ratio is always preserved.
+
+### How image processing works
+
+1. **Decode + orientation.** The upload is decoded with EXIF orientation applied
+   (`createImageBitmap(file, { imageOrientation: 'from-image' })`) and
+   re-rasterized to a canonical image, so phone photos aren't exported sideways
+   and the model and compositor share the exact same pixels.
+2. **Lazy model load.** On the first **Remove Background**, the Web Worker
+   downloads and initializes RMBG-1.4 (reused for every later image).
+3. **Preprocess + infer.** `AutoProcessor` resizes/normalizes to the model's
+   1024×1024 input; the model returns a single-channel saliency matte.
+4. **Postprocess the mask.** The `[0,1]` matte is scaled to `[0,255]` and resized
+   **back to the original image dimensions**, so it aligns pixel-for-pixel with
+   the full-resolution source (no stretching or distortion).
+5. **Composite.** On the main thread, the original pixels are drawn to a canvas
+   and the matte is multiplied into the alpha channel — background pixels become
+   fully transparent while the foreground keeps its original colour. Soft matte
+   edges (0–255) are preserved for smooth, non-jagged cut-outs; transparency is
+   never replaced with white.
+6. **Export.** `canvas.toBlob('image/png')` encodes a transparent PNG natively —
+   no extra image-processing dependency — which the **Download** button saves.
+
+### Resource management
+
+- Only **one segmentation runs at a time** (guarded in both the worker and the
+  hook); clicking while busy is ignored.
+- Every request carries a monotonic id, so if you swap images mid-inference the
+  **stale result is discarded** and can't overwrite the newer image.
+- Preview and cut-out **object URLs are revoked** when replaced, on reset, and on
+  unmount; the worker is torn down on unmount, which also safely covers
+  **navigating away during model loading or processing**.
+- The alpha matte is transferred (not copied) from the worker via a transferable
+  `ArrayBuffer`.
+
+### Known limitations
+
+- **The cut-out is a best effort, not a perfect mask — review before using.**
+  Like all automatic matting, RMBG can struggle with **fine hair and fur edges**,
+  **transparent or translucent objects** (glass, smoke, water), thin structures,
+  and busy or low-contrast backgrounds where foreground and background blend.
+- **Single salient subject.** As a saliency model it isolates the main
+  foreground; images with no clear subject, or several equally-prominent
+  subjects, can give ambiguous results.
+- **Non-commercial license** (see above) — this model cannot be used in a
+  commercial product without a BRIA license; use `Xenova/modnet` or a licensed
+  model instead.
+- First run is slower because of the one-time model download and (on WebGPU)
+  shader compilation; later images reuse the loaded model.
+- No remote/cloud fallback exists by design. If local inference can't run, the
+  feature reports an error instead of silently calling an API.
+
+### How it's built (architecture)
+
+The feature is split into focused modules under
+`src/features/background-remover/`:
+
+```text
+worker.ts                 # Model init + lazy load + segmentation -> alpha matte (Web Worker)
+useBackgroundRemover.ts   # React hook: worker lifecycle, stale-result guarding, compositing, state
+image.ts                  # Upload validation + EXIF-correct decode + downscale + object-URL cleanup
+compose.ts                # Apply the matte to the original pixels + transparent-PNG export + download
+types.ts                  # MODEL_ID, AlphaMask, device/progress types, worker message protocol
+components/               # Dropzone, ModelStatus (download progress), BeforeAfter (comparison slider)
+```
+
+React UI, model inference, image preprocessing, alpha-mask compositing, and PNG
+export are each isolated. The model is loaded lazily on the first removal, runs
+in a Web Worker to keep the UI responsive, and is reused across subsequent
+images. It is a separate worker and model from the other tabs — each feature
+downloads its own model only when its route is visited, so an unrelated tab never
+pulls weights it doesn't need.
+
+### How to run and test
+
+1. `npm install` then `npm run dev`, and open the **Background Remover** tab (or
+   go to `/background-remover`).
+2. Drag in an image (or **Choose file**) — a product photo, portrait, or everyday
+   object works best. The original preview appears.
+3. Click **Remove Background**. The first run downloads the model (watch the
+   per-file progress); later images reuse it.
+4. When it finishes, drag the **comparison slider** to compare original vs.
+   cut-out over the transparency checkerboard.
+5. **Download Transparent PNG** (enabled only once a valid result exists) saves
+   the cut-out. **Reset** clears everything; the model stays loaded.
+
 ## Project structure
 
 ```text
@@ -651,11 +926,11 @@ src/
     layout/      # RootLayout (shell + Outlet), Header, Tabs (NavLink), Footer, NotFound
     ui/          # Reusable primitives: Card, Badge, FeaturePanel, Placeholder
   features/
-    screenshot-bug-reporter/   # ✅ implemented (SmolVLM-Instruct, VQA)
     ai-accessibility/          # ✅ implemented (Florence-2, image captioning)
     smart-ticket-creator/      # ✅ implemented (Qwen2.5-1.5B-Instruct, structured extraction)
     pause-and-ask/             # ✅ implemented (LFM2.5-VL-450M, live camera VQA)
-    semantic-search/
+    semantic-search/           # ✅ implemented (all-MiniLM-L6-v2, embeddings + cosine search)
+    background-remover/        # ✅ implemented (RMBG-1.4, foreground segmentation -> transparent PNG)
     registry.ts  # Navigation metadata for the tab bar
   hooks/         # Feature-specific hooks (added later)
   lib/           # cn() className helper
@@ -671,13 +946,13 @@ Each feature is an independent, bookmarkable route served under a shared layout:
 
 | Route | Feature |
 | --- | --- |
-| `/screenshot-bug-reporter` | Screenshot Bug Reporter |
 | `/ai-accessibility` | AI Accessibility |
 | `/smart-ticket-creator` | Smart Ticket Creator |
 | `/pause-and-ask` | Pause & Ask |
 | `/semantic-search` | Semantic Search |
+| `/background-remover` | AI Background Remover |
 
-- `/` redirects to `/screenshot-bug-reporter`.
+- `/` redirects to `/ai-accessibility`.
 - Unknown routes render a simple **Page not found** fallback.
 - Every feature page is lazy-loaded with `React.lazy()` and streamed in under a
   `Suspense` fallback, so no feature code (or future on-demand AI model) is

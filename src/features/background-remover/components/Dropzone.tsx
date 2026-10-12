@@ -10,8 +10,8 @@ interface DropzoneProps {
 }
 
 /**
- * Screenshot input: drag-and-drop surface that doubles as a click target for
- * the hidden file picker. Accepts PNG / JPEG / WebP only.
+ * Image input: a drag-and-drop surface that doubles as a click target for the
+ * hidden file picker. Accepts PNG / JPEG / WebP only.
  */
 export function Dropzone({ onFile, disabled = false }: DropzoneProps) {
   const inputRef = useRef<HTMLInputElement>(null)
@@ -55,9 +55,7 @@ export function Dropzone({ onFile, disabled = false }: DropzoneProps) {
         <ImageIcon className="size-6" aria-hidden="true" />
       </span>
       <div className="space-y-1">
-        <p className="text-sm font-medium text-gray-200">
-          Drag &amp; drop a screenshot here
-        </p>
+        <p className="text-sm font-medium text-gray-200">Drag &amp; drop an image here</p>
         <p className="text-xs text-gray-500">PNG, JPEG, or WebP — processed on your device</p>
       </div>
       <button

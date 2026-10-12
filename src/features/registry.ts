@@ -1,19 +1,19 @@
-import { Bug, Accessibility, Ticket, Video, Search } from 'lucide-react'
+import { Accessibility, Ticket, Video, Search, Scissors } from 'lucide-react'
 import type { Feature } from '../types'
 
 /**
- * Single source of truth for the five feature tabs. Holds navigation metadata
+ * Single source of truth for the feature tabs. Holds navigation metadata
  * only — route components are lazy-loaded in the router config so no feature
  * code (or future AI model) is pulled in until its route is visited.
  */
 export const features: Feature[] = [
   {
-    id: 'screenshot-bug-reporter',
-    path: '/screenshot-bug-reporter',
-    label: 'Bug Reporter',
-    title: 'Screenshot Bug Reporter',
-    description: 'Upload a screenshot and generate a structured bug report.',
-    icon: Bug,
+    id: 'background-remover',
+    path: '/background-remover',
+    label: 'Background Remover',
+    title: 'AI Background Remover',
+    description: 'Remove an image background locally and download a transparent PNG.',
+    icon: Scissors,
   },
   {
     id: 'ai-accessibility',
@@ -32,19 +32,19 @@ export const features: Feature[] = [
     icon: Ticket,
   },
   {
-    id: 'pause-and-ask',
-    path: '/pause-and-ask',
-    label: 'Pause & Ask',
-    title: 'Pause & Ask',
-    description: 'Analyze a live camera feed, pause on a frame, and ask about its content.',
-    icon: Video,
-  },
-  {
     id: 'semantic-search',
     path: '/semantic-search',
     label: 'Semantic Search',
     title: 'Semantic Search',
     description: 'Search through local documents using semantic similarity.',
     icon: Search,
+  },
+  {
+    id: 'pause-and-ask',
+    path: '/pause-and-ask',
+    label: 'Pause & Ask',
+    title: 'Pause & Ask',
+    description: 'Analyze a live camera feed, pause on a frame, and ask about its content.',
+    icon: Video,
   },
 ]

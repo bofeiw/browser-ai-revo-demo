@@ -2,11 +2,11 @@ import type { LucideIcon } from 'lucide-react'
 
 /** Unique identifier for each feature tab. */
 export type FeatureId =
-  | 'screenshot-bug-reporter'
   | 'ai-accessibility'
   | 'smart-ticket-creator'
   | 'pause-and-ask'
   | 'semantic-search'
+  | 'background-remover'
 
 /** Browser technology a feature will eventually rely on. */
 export type BrowserTech = 'Transformers.js' | 'WebGPU' | 'WebAssembly' | 'ONNX Runtime'
@@ -18,7 +18,7 @@ export type BrowserTech = 'Transformers.js' | 'WebGPU' | 'WebAssembly' | 'ONNX R
 export interface Feature {
   /** Stable id used for keys. */
   id: FeatureId
-  /** URL path for the feature (e.g. "/screenshot-bug-reporter"). */
+  /** URL path for the feature (e.g. "/ai-accessibility"). */
   path: string
   /** Short label shown in the tab bar. */
   label: string

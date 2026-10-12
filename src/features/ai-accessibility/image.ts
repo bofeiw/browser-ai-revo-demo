@@ -9,10 +9,9 @@
  *  - Produce an object URL for previewing / passing to the model, with a
  *    matching revoke helper so callers can clean up allocations.
  *
- * This mirrors the Screenshot Bug Reporter's `image.ts` but is kept local to
- * the feature: the two features are independent and may diverge (e.g. accepted
- * types or max edge), and copying ~60 lines is cheaper than a shared image
- * abstraction that both features would have to agree on.
+ * This is kept local to the feature: features are independent and may diverge
+ * (e.g. accepted types or max edge), and copying ~60 lines is cheaper than a
+ * shared image abstraction that every feature would have to agree on.
  */
 
 export const ACCEPTED_IMAGE_TYPES = ['image/png', 'image/jpeg', 'image/webp'] as const
