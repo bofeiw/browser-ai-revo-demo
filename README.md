@@ -2,6 +2,8 @@
 
 **5 practical AI features. No backend. No cloud. Just your browser.**
 
+**Live demo:** [sylwia-lask.github.io/practical-browser-ai](https://sylwia-lask.github.io/practical-browser-ai/pause-and-ask)
+
 A React + TypeScript application that demonstrates practical use cases for
 local, in-browser AI. Each feature is designed to eventually run entirely on the
 client using browser-compatible models through technologies such as
