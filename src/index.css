@@ -25,3 +25,13 @@ body {
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
 }
+
+/* Minimal chrome for the live presentation. Original feature UI stays available. */
+[data-presentation="true"] > header,
+[data-presentation="true"] > footer,
+[data-presentation="true"] main > nav,
+[data-presentation="true"] .technical-details { display: none !important; }
+.presentation-status { display: none; }
+[data-presentation="true"] .presentation-status { display: block; }
+[data-presentation="true"] main { max-width: 1100px; padding-top: 16px; }
+[data-presentation="true"] input, [data-presentation="true"] textarea { font-size: 18px; }

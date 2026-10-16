@@ -1,4 +1,5 @@
 /// <reference lib="webworker" />
+import '../shared/runtime'
 /**
  * Embedding Web Worker for Local Semantic Search.
  *

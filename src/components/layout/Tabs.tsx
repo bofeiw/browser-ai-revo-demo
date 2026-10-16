@@ -1,4 +1,4 @@
-import { NavLink } from 'react-router-dom'
+import { NavLink, useSearchParams } from 'react-router-dom'
 import { cn } from '../../lib/cn'
 import type { Feature } from '../../types'
 
@@ -11,6 +11,8 @@ interface TabsProps {
  * highlights itself when its route is active.
  */
 export function Tabs({ features }: TabsProps) {
+  const [params] = useSearchParams()
+  const suffix = params.get('present') === '1' ? '?present=1' : ''
   return (
     <nav
       aria-label="AI features"
@@ -21,7 +23,7 @@ export function Tabs({ features }: TabsProps) {
         return (
           <NavLink
             key={feature.id}
-            to={feature.path}
+            to={feature.path + suffix}
             className={({ isActive }) =>
               cn(
                 'flex flex-1 items-center justify-center gap-2 whitespace-nowrap rounded-lg px-3 py-2.5 text-sm font-medium transition-colors',

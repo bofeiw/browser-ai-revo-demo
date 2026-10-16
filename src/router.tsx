@@ -5,11 +5,10 @@ import { NotFound } from './components/layout/NotFound'
 
 // Lazy-load each feature page so its code (and any future on-demand AI model)
 // is only fetched when the route is visited.
-const AiAccessibility = lazy(() => import('./features/ai-accessibility/AiAccessibility'))
 const SmartTicketCreator = lazy(
   () => import('./features/smart-ticket-creator/SmartTicketCreator'),
 )
-const PauseAndAsk = lazy(() => import('./features/pause-and-ask/PauseAndAsk'))
+const CampaignCreator = lazy(() => import('./features/campaign-creator/CampaignCreator'))
 const SemanticSearch = lazy(() => import('./features/semantic-search/SemanticSearch'))
 const BackgroundRemover = lazy(
   () => import('./features/background-remover/BackgroundRemover'),
@@ -23,9 +22,8 @@ export const router = createBrowserRouter(
     children: [
       // Redirect the index route to the first feature.
       { index: true, element: <Navigate to="/background-remover" replace /> },
-      { path: 'ai-accessibility', element: <AiAccessibility /> },
       { path: 'smart-ticket-creator', element: <SmartTicketCreator /> },
-      { path: 'pause-and-ask', element: <PauseAndAsk /> },
+      { path: 'campaign-creator', element: <CampaignCreator /> },
       { path: 'semantic-search', element: <SemanticSearch /> },
       { path: 'background-remover', element: <BackgroundRemover /> },
       // Fallback for unknown routes (rendered inside the shared layout).

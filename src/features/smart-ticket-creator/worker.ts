@@ -1,4 +1,5 @@
 /// <reference lib="webworker" />
+import '../shared/runtime'
 /**
  * Inference Web Worker for the Smart Ticket Creator.
  *
@@ -37,8 +38,8 @@ import type {
   WorkerRequest,
   WorkerResponse,
 } from './types'
-import { buildMessages, buildRetryMessages, type ChatMessage } from './prompt'
-import { parseTicket } from './parseTicket'
+import type { ChatMessage } from './prompt'
+import { buildDraftMessages, parseDraft, type DraftKind } from '../shared/draftTask'
 
 // Qwen2.5-0.5B-Instruct, not the 1.5B sibling. The 1.5B model in `q4` (f32
 // activations, the only numerically stable option on WebGPU — see the dtype
@@ -232,42 +233,26 @@ async function runOnce(
  * if the first attempt is unparseable, retries once with a firmer prompt. If
  * both attempts fail, surfaces an error — never a fabricated/hardcoded ticket.
  */
-async function generate(complaint: string): Promise<void> {
+async function generate(input: string, kind: DraftKind = 'ticket'): Promise<void> {
   try {
+    if (!input.trim()) { reply({ status: 'error', message: '请先写下你的需求。' }); return }
     const pipeline = await Pipeline.get(handleProgress)
     reply({ status: 'generating', device: pipeline.device })
-
-    // First attempt with the full policy prompt.
-    let raw = await runOnce(pipeline, buildMessages(complaint), 768)
-    // Log the raw completion so failures can be diagnosed from the worker
-    // console instead of guessing at what the model produced.
-    console.debug('[ticket] raw attempt #1:', JSON.stringify(raw))
-    let parsed = parseTicket(raw)
-
-    // Local recovery: one firmer retry if the output wasn't valid. No remote
-    // model is involved; this stays entirely on-device.
+    let raw = await runOnce(pipeline, buildDraftMessages(kind, input), 768)
+    let parsed = parseDraft(kind, raw, input)
     if (!parsed.ok && !(stoppingCriteria?.interrupted ?? false)) {
-      const retryRaw = await runOnce(pipeline, buildRetryMessages(complaint), 768)
-      console.debug('[ticket] raw attempt #2:', JSON.stringify(retryRaw))
-      const retryParsed = parseTicket(retryRaw)
-      raw = retryRaw
-      parsed = retryParsed
+      raw = await runOnce(pipeline, buildDraftMessages(kind, input, true), 768)
+      parsed = parseDraft(kind, raw, input)
     }
-
-    if (!parsed.ok) {
-      const preview = raw.trim().slice(0, 200)
-      reply({
-        status: 'error',
-        message:
-          'The model did not return a valid ticket (' +
-          parsed.reason +
-          '). This can happen with a small on-device model — try again or rephrase the complaint.' +
-          (preview ? `\n\nModel output started with:\n"${preview}${raw.length > 200 ? '…' : ''}"` : '\n\n(The model returned no text.)'),
-      })
+    if (stoppingCriteria?.interrupted) {
+      reply({ status: 'error', message: '已停止生成，可以修改描述后重试。' })
       return
     }
-
-    reply({ status: 'complete', ticket: parsed.ticket, raw })
+    if (!parsed.ok) {
+      reply({ status: 'error', message: '未能生成完整草稿。请简化描述后重试。' })
+      return
+    }
+    reply({ ...parsed.result, raw })
   } catch (err) {
     reply({ status: 'error', message: toMessage(err) })
   }
@@ -290,7 +275,7 @@ self.addEventListener('message', (event: MessageEvent<WorkerRequest>) => {
       void load()
       break
     case 'generate':
-      void generate(data.complaint)
+      void generate(data.complaint, data.task)
       break
     case 'interrupt':
       stoppingCriteria?.interrupt()

@@ -125,7 +125,7 @@ export function SemanticSearch() {
           {liveMessage}
         </p>
 
-        <div className="flex flex-wrap gap-2">
+        <div className="technical-details flex flex-wrap gap-2">
           <Badge>all-MiniLM-L6-v2</Badge>
           <Badge>Transformers.js v4</Badge>
           <Badge>384-dim embeddings</Badge>

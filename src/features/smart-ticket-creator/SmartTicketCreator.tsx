@@ -83,10 +83,10 @@ export function SmartTicketCreator() {
     <FeaturePanel
       icon={TicketIcon}
       title="Smart Ticket Creator"
-      description="Turn a messy, unstructured complaint into a clear, structured issue ticket — fully on-device."
+      description="把零散的问题描述整理成清楚的工单，检查后再使用。"
     >
       <div className="space-y-6">
-        <div className="flex flex-wrap gap-2">
+        <div className="technical-details flex flex-wrap gap-2">
           <Badge>Qwen2.5-0.5B-Instruct</Badge>
           <Badge>Transformers.js v4</Badge>
           <Badge>WebGPU</Badge>
@@ -149,7 +149,7 @@ export function SmartTicketCreator() {
               <Sparkles className="size-4" aria-hidden="true" />
             )}
             {status === 'loading-model'
-              ? 'Loading model…'
+              ? '首次准备中…'
               : status === 'generating'
                 ? 'Generating…'
                 : 'Generate Ticket'}
@@ -179,13 +179,14 @@ export function SmartTicketCreator() {
         </div>
 
         {/* Model status / download progress */}
-        {(busy || support.checked) && (
+        {busy && <p className="presentation-status text-sm text-gray-300" role="status">{status === 'loading-model' ? '正在准备，首次使用需要下载。' : '正在整理工单…'}</p>}
+        <div className="technical-details">{(busy || support.checked) && (
           <ModelStatus status={status} support={support} device={device} progress={progress} />
-        )}
+        )}</div>
 
         {/* Live streamed output while generating */}
         {status === 'generating' && streamedText && (
-          <div className="space-y-1.5">
+          <div className="technical-details space-y-1.5">
             <p className="flex items-center justify-between gap-2 text-xs font-semibold uppercase tracking-wide text-gray-400">
               <span>Model output (streaming)</span>
               {tokensPerSecond != null && (
@@ -204,8 +205,8 @@ export function SmartTicketCreator() {
         {status === 'error' && error && (
           <div className="space-y-1.5 rounded-md border border-rose-400/30 bg-rose-500/10 px-3 py-3 text-sm text-rose-200">
             <p className="font-medium">Generation failed</p>
-            <p className="text-rose-300/90">{error}</p>
-            <p className="text-xs text-rose-300/70">
+            <p className="technical-details text-rose-300/90">{error}</p><p className="presentation-status">未能整理完整，请修改描述后重试。</p>
+            <p className="technical-details text-xs text-rose-300/70">
               This can happen if the browser lacks WebGPU and has insufficient memory
               for the CPU fallback, or if the small model did not return valid JSON.
               Try again, rephrase the complaint, or use a Chromium-based desktop
@@ -246,7 +247,7 @@ export function SmartTicketCreator() {
                 <button
                   type="button"
                   onClick={() => copy('json')}
-                  className="inline-flex items-center gap-2 rounded-md border border-white/15 bg-white/5 px-3 py-2 text-sm text-gray-200 transition-colors hover:bg-white/10"
+                  className="technical-details inline-flex items-center gap-2 rounded-md border border-white/15 bg-white/5 px-3 py-2 text-sm text-gray-200 transition-colors hover:bg-white/10"
                 >
                   {copied === 'json' ? (
                     <Check className="size-4 text-emerald-400" aria-hidden="true" />

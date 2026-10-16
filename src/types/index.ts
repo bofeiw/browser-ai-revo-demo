@@ -2,9 +2,8 @@ import type { LucideIcon } from 'lucide-react'
 
 /** Unique identifier for each feature tab. */
 export type FeatureId =
-  | 'ai-accessibility'
   | 'smart-ticket-creator'
-  | 'pause-and-ask'
+  | 'campaign-creator'
   | 'semantic-search'
   | 'background-remover'
 
@@ -18,7 +17,7 @@ export type BrowserTech = 'Transformers.js' | 'WebGPU' | 'WebAssembly' | 'ONNX R
 export interface Feature {
   /** Stable id used for keys. */
   id: FeatureId
-  /** URL path for the feature (e.g. "/ai-accessibility"). */
+  /** URL path for the feature (e.g. "/background-remover"). */
   path: string
   /** Short label shown in the tab bar. */
   label: string

@@ -1,3 +1,4 @@
+import type { Campaign } from '../campaign-creator/types'
 /**
  * Type definitions and validation schema for the Smart Ticket Creator.
  *
@@ -130,6 +131,7 @@ export type WorkerRequest =
       type: 'generate'
       /** The raw, unstructured complaint typed by the user. */
       complaint: string
+      task?: 'ticket' | 'campaign'
     }
   | { type: 'interrupt' }
 
@@ -144,4 +146,5 @@ export type WorkerResponse =
   | { status: 'token'; text: string; tokensPerSecond: number | null }
   /** Final validated ticket plus the raw model text (for transparency). */
   | { status: 'complete'; ticket: Ticket; raw: string }
+  | { status: 'campaign-complete'; campaign: Campaign; raw: string }
   | { status: 'error'; message: string }

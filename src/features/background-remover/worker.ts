@@ -1,4 +1,5 @@
 /// <reference lib="webworker" />
+import '../shared/runtime'
 /**
  * Inference Web Worker for the AI Background Remover.
  *

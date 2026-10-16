@@ -82,7 +82,7 @@ export function BackgroundRemover() {
   const hasResult = status === 'done' && cutout !== null
 
   const buttonLabel = (() => {
-    if (status === 'loading-model') return 'Loading model…'
+    if (status === 'loading-model') return '首次准备中…'
     if (status === 'segmenting') return 'Removing background…'
     if (status === 'compositing') return 'Finishing…'
     return hasResult ? 'Run again' : 'Remove Background'
@@ -94,10 +94,10 @@ export function BackgroundRemover() {
     <FeaturePanel
       icon={Scissors}
       title="AI Background Remover"
-      description="Upload an image, strip its background with a local AI model, and download a transparent PNG — fully on-device."
+      description="选择图片，去掉背景，保存透明图片。图片在当前设备上处理。"
     >
       <div className="space-y-6">
-        <div className="flex flex-wrap gap-2">
+        <div className="technical-details flex flex-wrap gap-2">
           <Badge>RMBG-1.4</Badge>
           <Badge>Transformers.js v4</Badge>
           <Badge>WebGPU</Badge>
@@ -205,11 +205,12 @@ export function BackgroundRemover() {
                 )}
               >
                 <Download className="size-4" aria-hidden="true" />
-                Download Transparent PNG
+                Download image
               </button>
 
               {/* Model status / download progress. */}
-              {(busy || support.checked) && (
+              {busy && <p className="presentation-status text-sm text-gray-300" role="status">{status === 'loading-model' ? '正在准备，首次使用需要下载。' : '正在处理图片…'}</p>}
+              <div className="technical-details">{(busy || support.checked) && (
                 <ModelStatus
                   status={status}
                   support={support}
@@ -217,14 +218,14 @@ export function BackgroundRemover() {
                   progress={progress}
                   modelId={MODEL_ID}
                 />
-              )}
+              )}</div>
 
               {/* Inference error. */}
               {status === 'error' && error && (
                 <div className="space-y-1.5 rounded-md border border-rose-400/30 bg-rose-500/10 px-3 py-3 text-sm text-rose-200">
                   <p className="font-medium">Background removal failed</p>
-                  <p className="text-rose-300/90">{error}</p>
-                  <p className="text-xs text-rose-300/70">
+                  <p className="technical-details text-rose-300/90">{error}</p><p className="presentation-status">处理未完成，请重试或换一张图片。</p>
+                  <p className="technical-details text-xs text-rose-300/70">
                     This can happen if the browser lacks WebGPU and has insufficient memory for
                     the CPU fallback. Try a Chromium-based desktop browser with WebGPU enabled.
                   </p>
@@ -235,9 +236,7 @@ export function BackgroundRemover() {
                 <div className="flex items-start gap-2 rounded-md border border-sky-400/20 bg-sky-500/5 px-3 py-2.5 text-xs text-sky-200/90">
                   <Info className="mt-0.5 size-4 shrink-0 text-sky-300" aria-hidden="true" />
                   <p>
-                    The PNG is exported at the source resolution ({cutout?.width}×{cutout?.height}px)
-                    with a real alpha channel. Fine edges like hair, or transparent and reflective
-                    objects, can still confuse the model — review before using.
+                    图片按原始尺寸保存。头发、透明和反光物体的边缘可能不够准确，使用前请检查。
                   </p>
                 </div>
               )}

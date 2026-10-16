@@ -1,5 +1,5 @@
-import { Suspense } from 'react'
-import { Outlet } from 'react-router-dom'
+import { Suspense, useEffect } from 'react'
+import { Outlet, useSearchParams } from 'react-router-dom'
 import { Loader2 } from 'lucide-react'
 import { Header } from './Header'
 import { Footer } from './Footer'
@@ -25,8 +25,16 @@ function RouteFallback() {
  * route rendered through an Outlet. Lazy routes stream in under Suspense.
  */
 export function RootLayout() {
+  const [params] = useSearchParams()
+  const presentation = params.get('present') === '1'
+  useEffect(() => {
+    if (!presentation) return
+    const close = (event: KeyboardEvent) => { if (event.key === 'Escape' && window.parent !== window) window.parent.postMessage({type:'demo-close'}, '*') }
+    window.addEventListener('keydown', close)
+    return () => window.removeEventListener('keydown', close)
+  }, [presentation])
   return (
-    <div className="flex min-h-full flex-col">
+    <div data-presentation={presentation} className="flex min-h-full flex-col">
       <Header />
 
       <main className="mx-auto w-full max-w-5xl flex-1 px-4 py-6 sm:px-6 sm:py-8">
