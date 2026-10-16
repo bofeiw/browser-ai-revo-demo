@@ -54,3 +54,9 @@ The HTML deck lives separately in the sibling AI Bites project at `../26.04.17-a
 Original project and article by Sylwia Laskowska: [Your Browser Can Do WHAT?!](https://dev.to/sylwia-lask/your-browser-can-do-what-5-ai-features-that-actually-work-1blb).
 
 The original repository describes its use as “For demonstration purposes.” No broader code license is assumed. The background model [BRIA RMBG-1.4](https://huggingface.co/briaai/RMBG-1.4) requires a separate commercial agreement for commercial use. Confirm both code and model rights before shipping in a product. This adaptation remains a local demonstration.
+
+## GitHub Pages
+
+The site deploys to `https://bofeiw.github.io/browser-ai-revo-demo/` through the included GitHub Actions workflow when `main` is pushed. Configure the repository's Pages source as **GitHub Actions**.
+
+The deployment builds with `GITHUB_PAGES=true`; Vite and the SPA fallback use `/browser-ai-revo-demo/`. If the repository is renamed, update `vite.config.ts` and `public/404.html` together.

@@ -28,14 +28,20 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
           cache: npm
+
+      - name: Configure Pages
+        uses: actions/configure-pages@v5
 
       - name: Install dependencies
         run: npm ci
 
+      - name: Test
+        run: npm test
+
       - name: Build
-        # GITHUB_PAGES flips vite's `base` to /practical-browser-ai/.
+        # GITHUB_PAGES flips vite's `base` to /browser-ai-revo-demo/.
         env:
           GITHUB_PAGES: 'true'
         run: npm run build
